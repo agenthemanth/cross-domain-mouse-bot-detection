@@ -26,24 +26,27 @@ Found 1676 Balabit raw session files.
   ...processed 1600/1676 raw files, 14196 sessions evaluated so far
 
 Total Balabit sessions evaluated: 24182
-False positives (predicted bot, truly human): 2381
-Balabit False Positive Rate: 9.85%
+False positives (predicted bot, truly human): 2368
+Balabit False Positive Rate: 9.79%
 
 --- FALSE POSITIVE RATE BY USER ---
 user         sessions        FPs       FPR%
-user12           4557        342      7.50%
-user15           3702        509     13.75%
-user16           2810        256      9.11%
-user20           1701        151      8.88%
-user21           1505        168     11.16%
-user23           2047        156      7.62%
-user29           1821        149      8.18%
-user35           2403        279     11.61%
-user7            1790        173      9.66%
-user9            1846        198     10.73%
+user12           4557        354      7.77%
+user15           3702        503     13.59%
+user16           2810        255      9.07%
+user20           1701        150      8.82%
+user21           1505        176     11.69%
+user23           2047        163      7.96%
+user29           1821        143      7.85%
+user35           2403        276     11.49%
+user7            1790        171      9.55%
+user9            1846        177      9.59%
 
---- COMPARISON TO MIGHTYMERGE (run FalsePositiveEvaluator for that number) ---
-mightymerge.io FPR was 2.18% (browsing-style human behavior).
-Balabit FPR above reflects continuous administrative/work-task mouse behavior --
-a genuinely different behavioral context. A gap between these two numbers is a
-real, reportable finding about generalization boundaries, not a bug.
+--- THIS IS THE PROJECT'S CROSS-DATASET FALSE-POSITIVE RESULT ---
+Balabit provides real raw (x, y, t), so every kinematic feature is computed
+exactly the way DELBOT training computes it -- one feature-code path end to end.
+The mightymerge check (FalsePositiveEvaluator) is a rough sanity test only:
+it has no raw x/y, so 3 of 7 features are on mismatched scales train vs test,
+and it is NOT part of the cross-dataset story (methodology decision, 2026-08-28).
+The Balabit FPR reflects continuous administrative/work-task mouse behavior --
+an out-of-domain context relative to DELBOT's few-second circle-drawing tasks.

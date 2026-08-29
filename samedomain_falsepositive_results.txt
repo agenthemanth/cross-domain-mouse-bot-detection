@@ -1,0 +1,97 @@
+﻿--- STEP 1: TRAIN RANDOM FOREST ON DELBOT ONLY ---
+Found 10 DELBOT session folders.
+[1/10] circles_bot_gan -> 1899 files (parsed so far: 1899/1899)
+[2/10] circles_bot_naturalmousemotion -> 234 files (parsed so far: 2133/2133)
+[3/10] circles_bot_pyhm -> 55 files (parsed so far: 2188/2188)
+[4/10] circles_bot_pynput -> 408 files (parsed so far: 2596/2596)
+[5/10] circles_human_fast -> 9 files (parsed so far: 2605/2605)
+[6/10] circles_human_pc1 -> 187 files (parsed so far: 2792/2792)
+[7/10] circles_human_pc2 -> 459 files (parsed so far: 3251/3251)
+[8/10] circles_human_pc2_pad -> 62 files (parsed so far: 3313/3313)
+[9/10] circles_human_tel -> 98 files (parsed so far: 3313/3411)
+[10/10] circles_human_vm -> 140 files (parsed so far: 3453/3551)
+DELBOT training instances: 3453
+WARNING: core mtj jar files are not available as resources to this classloader (jdk.internal.loader.ClassLoaders$AppClassLoader@105be200)
+Random Forest trained (100 trees).
+
+--- STEP 2: EVALUATE ON HELD-OUT HUMAN REFERENCE SET (out-of-domain) ---
+  ...evaluated 10000 sessions so far
+  ...evaluated 20000 sessions so far
+  ...evaluated 30000 sessions so far
+  ...evaluated 40000 sessions so far
+Total human reference sessions evaluated: 45465
+False positives (predicted bot, truly human): 2479
+Micro-average False Positive Rate (row-level): 5.45%
+Macro-average False Positive Rate (per-person): 4.03% (across 5748 people)
+
+--- FALSE POSITIVE RATE BY SOURCE FILE ---
+source_dataset              sessions        FPs       FPR%
+mightymerge.io__z0m3ceve__dataset_1        558         49      8.78%
+mightymerge.io__z0m3ceve__dataset_10        769         55      7.15%
+mightymerge.io__z0m3ceve__dataset_11        876         44      5.02%
+mightymerge.io__z0m3ceve__dataset_12        732         37      5.05%
+mightymerge.io__z0m3ceve__dataset_13        878         39      4.44%
+mightymerge.io__z0m3ceve__dataset_14        886         64      7.22%
+mightymerge.io__z0m3ceve__dataset_15       1003         84      8.37%
+mightymerge.io__z0m3ceve__dataset_16        626         38      6.07%
+mightymerge.io__z0m3ceve__dataset_17        641         31      4.84%
+mightymerge.io__z0m3ceve__dataset_18        611         16      2.62%
+mightymerge.io__z0m3ceve__dataset_19        824         39      4.73%
+mightymerge.io__z0m3ceve__dataset_2        939         80      8.52%
+mightymerge.io__z0m3ceve__dataset_20        653         27      4.13%
+mightymerge.io__z0m3ceve__dataset_21       1050         49      4.67%
+mightymerge.io__z0m3ceve__dataset_22        507         14      2.76%
+mightymerge.io__z0m3ceve__dataset_23        725         36      4.97%
+mightymerge.io__z0m3ceve__dataset_24        646         32      4.95%
+mightymerge.io__z0m3ceve__dataset_25        773         53      6.86%
+mightymerge.io__z0m3ceve__dataset_26        940         50      5.32%
+mightymerge.io__z0m3ceve__dataset_27        827         43      5.20%
+mightymerge.io__z0m3ceve__dataset_28        829         41      4.95%
+mightymerge.io__z0m3ceve__dataset_29       1049         49      4.67%
+mightymerge.io__z0m3ceve__dataset_3        860         53      6.16%
+mightymerge.io__z0m3ceve__dataset_30        881         61      6.92%
+mightymerge.io__z0m3ceve__dataset_31        916         50      5.46%
+mightymerge.io__z0m3ceve__dataset_32        652         35      5.37%
+mightymerge.io__z0m3ceve__dataset_33        723         22      3.04%
+mightymerge.io__z0m3ceve__dataset_34        840         32      3.81%
+mightymerge.io__z0m3ceve__dataset_35        667         35      5.25%
+mightymerge.io__z0m3ceve__dataset_36        781         36      4.61%
+mightymerge.io__z0m3ceve__dataset_37       1105         51      4.62%
+mightymerge.io__z0m3ceve__dataset_38        891         31      3.48%
+mightymerge.io__z0m3ceve__dataset_39        677         43      6.35%
+mightymerge.io__z0m3ceve__dataset_4        579         41      7.08%
+mightymerge.io__z0m3ceve__dataset_40        735         36      4.90%
+mightymerge.io__z0m3ceve__dataset_41        851         38      4.47%
+mightymerge.io__z0m3ceve__dataset_42       1101         83      7.54%
+mightymerge.io__z0m3ceve__dataset_43       1231        103      8.37%
+mightymerge.io__z0m3ceve__dataset_44       1037         73      7.04%
+mightymerge.io__z0m3ceve__dataset_45        782         46      5.88%
+mightymerge.io__z0m3ceve__dataset_46        770         35      4.55%
+mightymerge.io__z0m3ceve__dataset_47        675         30      4.44%
+mightymerge.io__z0m3ceve__dataset_48        789         46      5.83%
+mightymerge.io__z0m3ceve__dataset_49        724         29      4.01%
+mightymerge.io__z0m3ceve__dataset_5        703         45      6.40%
+mightymerge.io__z0m3ceve__dataset_50        736         23      3.13%
+mightymerge.io__z0m3ceve__dataset_51        840         46      5.48%
+mightymerge.io__z0m3ceve__dataset_52        767         32      4.17%
+mightymerge.io__z0m3ceve__dataset_53        757         42      5.55%
+mightymerge.io__z0m3ceve__dataset_54        916         49      5.35%
+mightymerge.io__z0m3ceve__dataset_55        698         36      5.16%
+mightymerge.io__z0m3ceve__dataset_56        858         49      5.71%
+mightymerge.io__z0m3ceve__dataset_57        614         23      3.75%
+mightymerge.io__z0m3ceve__dataset_6        856         46      5.37%
+mightymerge.io__z0m3ceve__dataset_7        621         31      4.99%
+mightymerge.io__z0m3ceve__dataset_8        673         29      4.31%
+mightymerge.io__z0m3ceve__dataset_9        817         49      6.00%
+
+--- WORST 10 PEOPLE BY FALSE POSITIVE RATE (min 2 sessions) ---
+mightymerge.io__z0m3ceve__dataset_42::5588     2 sessions, 100.0% FPR
+mightymerge.io__z0m3ceve__dataset_9::6443     2 sessions, 100.0% FPR
+mightymerge.io__z0m3ceve__dataset_1::4853     3 sessions,  66.7% FPR
+mightymerge.io__z0m3ceve__dataset_39::5797    10 sessions,  60.0% FPR
+mightymerge.io__z0m3ceve__dataset_5::6566     5 sessions,  60.0% FPR
+mightymerge.io__z0m3ceve__dataset_35::5731     7 sessions,  57.1% FPR
+mightymerge.io__z0m3ceve__dataset_11::6403     2 sessions,  50.0% FPR
+mightymerge.io__z0m3ceve__dataset_11::6442     2 sessions,  50.0% FPR
+mightymerge.io__z0m3ceve__dataset_12::5125     2 sessions,  50.0% FPR
+mightymerge.io__z0m3ceve__dataset_12::6296    14 sessions,  50.0% FPR

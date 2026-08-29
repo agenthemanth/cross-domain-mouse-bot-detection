@@ -1,0 +1,45 @@
+Balabit users: [user12, user15, user16, user20, user21, user23, user29, user35, user7, user9]
+  TRAIN users [user12, user16, user21, user29, user7]  -> 12483 human chunks
+  TEST  users [user15, user20, user23, user35, user9]  -> 11699 human chunks
+DELBOT session folders: 10
+Training-bot timing: BURST | test-bot timing: reported per model
+
+[BASELINE  DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=11.05%  AUC=0.5136  EER=48.23%  TPR@<=1%=0.01%  TPR@<=5%=0.18%
+[BASELINE  DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=11.05%  AUC=0.4561  EER=52.11%  TPR@<=1%=0.01%  TPR@<=5%=0.01%
+[BASELINE  AUG_ALL     test=MATCHED_SPREAD] trainN=28419   humFPR= 1.00%  AUC=0.9977  EER= 1.81%  TPR@<=1%=92.91%  TPR@<=5%=99.98%
+[BASELINE  AUG_ALL     test=BURST        ] trainN=28419   humFPR= 1.00%  AUC=0.9996  EER= 0.74%  TPR@<=1%=99.49%  TPR@<=5%=99.99%
+[BASELINE  AUG_HELDOUT test=MATCHED_SPREAD] trainN=28419   humFPR= 0.52%  AUC=0.9980  EER= 1.31%  TPR@<=1%=95.89%  TPR@<=5%=99.97%
+            unseen-type AUC:  MODERATE_LINEAR_VP=0.9997  ADVANCED_BEZIER_VP_JITTER=0.9948
+[BASELINE  AUG_HELDOUT test=BURST        ] trainN=28419   humFPR= 0.52%  AUC=0.9794  EER= 5.40%  TPR@<=1%=90.84%  TPR@<=5%=93.36%
+            unseen-type AUC:  MODERATE_LINEAR_VP=0.9992  ADVANCED_BEZIER_VP_JITTER=0.9185
+
+[SCALEFREE DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=28.29%  AUC=0.3567  EER=61.44%  TPR@<=1%=0.01%  TPR@<=5%=0.22%
+[SCALEFREE DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=28.29%  AUC=0.3396  EER=62.27%  TPR@<=1%=0.00%  TPR@<=5%=0.09%
+[SCALEFREE AUG_ALL     test=MATCHED_SPREAD] trainN=28419   humFPR= 0.41%  AUC=0.9987  EER= 0.54%  TPR@<=1%=99.75%  TPR@<=5%=100.00%
+[SCALEFREE AUG_ALL     test=BURST        ] trainN=28419   humFPR= 0.41%  AUC=0.9999  EER= 0.20%  TPR@<=1%=99.97%  TPR@<=5%=100.00%
+[SCALEFREE AUG_HELDOUT test=MATCHED_SPREAD] trainN=28419   humFPR= 0.43%  AUC=0.9979  EER= 1.14%  TPR@<=1%=98.07%  TPR@<=5%=99.99%
+            unseen-type AUC:  MODERATE_LINEAR_VP=0.9996  ADVANCED_BEZIER_VP_JITTER=0.9946
+[SCALEFREE AUG_HELDOUT test=BURST        ] trainN=28419   humFPR= 0.43%  AUC=0.9983  EER= 1.49%  TPR@<=1%=94.66%  TPR@<=5%=99.99%
+            unseen-type AUC:  MODERATE_LINEAR_VP=0.9998  ADVANCED_BEZIER_VP_JITTER=0.9935
+
+========================================================================
+ TIER 2 STEP 2 -- TRAINING AUGMENTATION  (held-out Balabit users)
+========================================================================
+feat      trainset    testBotTiming   humFPR pooledAUC       EER    TPR@<=1%    TPR@<=5%
+BASELINE  DELBOT_ONLY MATCHED_SPREAD   11.05%    0.5136    48.23%       0.01%       0.18%
+BASELINE  DELBOT_ONLY BURST           11.05%    0.4561    52.11%       0.01%       0.01%
+BASELINE  AUG_ALL     MATCHED_SPREAD    1.00%    0.9977     1.81%      92.91%      99.98%
+BASELINE  AUG_ALL     BURST            1.00%    0.9996     0.74%      99.49%      99.99%
+BASELINE  AUG_HELDOUT MATCHED_SPREAD    0.52%    0.9980     1.31%      95.89%      99.97%
+BASELINE  AUG_HELDOUT BURST            0.52%    0.9794     5.40%      90.84%      93.36%
+SCALEFREE DELBOT_ONLY MATCHED_SPREAD   28.29%    0.3567    61.44%       0.01%       0.22%
+SCALEFREE DELBOT_ONLY BURST           28.29%    0.3396    62.27%       0.00%       0.09%
+SCALEFREE AUG_ALL     MATCHED_SPREAD    0.41%    0.9987     0.54%      99.75%     100.00%
+SCALEFREE AUG_ALL     BURST            0.41%    0.9999     0.20%      99.97%     100.00%
+SCALEFREE AUG_HELDOUT MATCHED_SPREAD    0.43%    0.9979     1.14%      98.07%      99.99%
+SCALEFREE AUG_HELDOUT BURST            0.43%    0.9983     1.49%      94.66%      99.99%
+
+WIN CONDITION: pooledAUC materially above the DELBOT_ONLY row for the same
+feat+timing, with humFPR held at or below the DELBOT_ONLY level. AUG_HELDOUT's
+*_VP* types are unseen in training -- that row is the honest generalisation test.
+Caveat: test bots share the BalabitBotSynthesizer generator; no GAN trajectories.

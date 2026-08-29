@@ -37,3 +37,17 @@ build/
 
 ### Mac OS ###
 .DS_Store
+### Claude Code / local ###
+.claude/
+AGENT_HANDOFF.txt
+
+### Datasets (large, not in repo — see project docs for sources) ###
+balabit_data/
+delbot_data/
+human_mouse_reference_features.csv
+click_fraud_dataset (1).csv
+
+### Generated feature CSVs ###
+delbot_features_engineered.csv
+click_fraud_phase2_engineered.csv
+feature_range_diag.txt

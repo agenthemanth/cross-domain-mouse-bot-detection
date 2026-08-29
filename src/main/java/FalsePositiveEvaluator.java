@@ -1,4 +1,4 @@
-import weka.classifiers.trees.J48;
+import weka.classifiers.trees.RandomForest;
 import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instance;
@@ -15,10 +15,29 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Safe evaluation step: trains J48 ONLY on DELBOT-Mouse (never on the human
- * reference set), then classifies every session in human_mouse_reference_features.csv
- * -- a fully held-out, out-of-domain, known-all-human dataset -- to measure the
- * classifier's false positive rate on real human behavior it has never seen.
+ * ROUGH SANITY CHECK ONLY -- NOT the project's cross-dataset result.
+ * Trains a Random Forest (100 trees) ONLY on DELBOT-Mouse (never on the human
+ * reference set), then classifies every session in
+ * human_mouse_reference_features.csv -- a held-out, known-all-human dataset --
+ * as a quick smell test for gross over-flagging of real humans.
+ *
+ * This check is DEMOTED from the cross-dataset story (methodology decision,
+ * 2026-08-28) because it is fundamentally confounded: mightymerge has no raw
+ * x/y, so the reference CSV's velocity/acceleration/jerk columns cannot be
+ * computed the way DELBOT training computes them (different formula AND ~1000x
+ * scale gap, with garbage negatives). 3 of 7 features are on mismatched scales
+ * train vs test; only num_points / duration_ms / path_efficiency are
+ * comparable. --> BalabitValidationPipeline (real x/y/t, one feature-code path
+ * end to end) is the sound cross-dataset evaluation; use its numbers.
+ *
+ * For the record: this check currently reports FPR 5.45% micro
+ * (2479 / 45465 sessions) / 4.03% macro. The earlier "2.18% (J48) -> 0.71%
+ * (RF)" numbers predate the training-side feature fix and are retracted.
+ *
+ * Random Forest is the final classifier, selected after a documented
+ * head-to-head comparison against J48 (see project report). J48 remains
+ * in the report as the interpretable model used to catch an earlier data-
+ * leakage issue, but is no longer used in this pipeline going forward.
  *
  * The human reference data is NEVER used for training, and NEVER merged with
  * DELBOT. This deliberately isolates "does the model over-flag genuine humans
@@ -28,29 +47,33 @@ import java.util.TreeMap;
  * rows -- a single prolific person or file should not be able to dominate the
  * headline false-positive number.
  *
- * This file duplicates the small amount of DELBOT-parsing logic it needs
- * internally rather than modifying DelbotValidationPipeline.java, so that file's
- * existing behavior is left untouched.
+ * Feature extraction is delegated to BalabitValidationPipeline.computeFeatures
+ * so the DELBOT training set built here is bit-identical to the one used by
+ * BalabitValidationPipeline and BalabitCrossDomainEval (same tied-timestamp
+ * collapse, same 1 ms dt floor).
  */
 public class FalsePositiveEvaluator {
 
     private static final String DELBOT_DATA_DIR = "delbot_data";
     private static final String HUMAN_REFERENCE_CSV = "human_mouse_reference_features.csv";
-    private static final double JERK_CLAMP = 1e6;
 
     public static void main(String[] args) throws Exception {
-        System.out.println("--- STEP 1: TRAIN J48 ON DELBOT ONLY ---");
+        System.out.println("NOTE: rough sanity check only -- NOT the project's cross-dataset result.");
+        System.out.println("mightymerge has no raw x/y, so 3 of 7 features are computed differently");
+        System.out.println("here than in DELBOT training. Use BalabitValidationPipeline for the");
+        System.out.println("sound cross-dataset false-positive rate.\n");
+        System.out.println("--- STEP 1: TRAIN RANDOM FOREST ON DELBOT ONLY ---");
         Instances trainingData = buildDelbotTrainingSet();
         System.out.println("DELBOT training instances: " + trainingData.numInstances());
 
-        J48 tree = new J48();
-        tree.setMinNumObj(20);
-        tree.setBinarySplits(true);
-        tree.buildClassifier(trainingData);
-        System.out.println("Model trained on DELBOT only.\n");
+        RandomForest rf = new RandomForest();
+        rf.setNumIterations(100);
+        rf.setSeed(1); // explicit (Weka default is 1) -- reproducible across runs
+        rf.buildClassifier(trainingData);
+        System.out.println("Random Forest trained (100 trees).\n");
 
         System.out.println("--- STEP 2: EVALUATE ON HELD-OUT HUMAN REFERENCE SET (out-of-domain) ---");
-        evaluateHumanReference(trainingData, tree);
+        evaluateHumanReference(trainingData, rf);
     }
 
     // ---------------------------------------------------------------
@@ -79,6 +102,7 @@ public class FalsePositiveEvaluator {
             int label = folder.getName().startsWith("circles_human") ? 0 : 1;
             File[] files = folder.listFiles((d, n) -> n.endsWith(".txt"));
             if (files == null) continue;
+            Arrays.sort(files); // deterministic training-instance order (File.listFiles has no guaranteed order)
             for (File f : files) {
                 filesSeen++;
                 double[] feat = parseDelbotSession(f);
@@ -114,6 +138,7 @@ public class FalsePositiveEvaluator {
     private static void findSessionFolders(File dir, List<File> found) {
         File[] children = dir.listFiles(File::isDirectory);
         if (children == null) return;
+        Arrays.sort(children);
         for (File child : children) {
             String name = child.getName();
             if (name.startsWith("circles_human") || name.startsWith("circles_bot")) {
@@ -125,6 +150,10 @@ public class FalsePositiveEvaluator {
     }
 
     // Returns [num_points, duration_ms, mean_velocity, std_velocity, mean_acceleration, mean_jerk, path_efficiency]
+    // Feature math is delegated to BalabitValidationPipeline.computeFeatures so the
+    // DELBOT training set here is IDENTICAL to the one used by BalabitValidationPipeline
+    // and BalabitCrossDomainEval -- including the tied-timestamp collapse and the 1 ms
+    // dt floor. (The old inline copy clamped dt to 1e-3 ms; see that file's comment.)
     private static double[] parseDelbotSession(File file) {
         try {
             List<double[]> points = new ArrayList<>();
@@ -143,40 +172,7 @@ public class FalsePositiveEvaluator {
                     } catch (NumberFormatException ignored) {}
                 }
             }
-            if (points.size() < 3) return null;
-
-            List<Double> velocities = new ArrayList<>();
-            List<Double> accelerations = new ArrayList<>();
-            List<Double> jerks = new ArrayList<>();
-            double totalDist = 0.0;
-            for (int i = 1; i < points.size(); i++) {
-                double dt = Math.max(points.get(i)[0] - points.get(i - 1)[0], 1e-3);
-                double dx = points.get(i)[1] - points.get(i - 1)[1];
-                double dy = points.get(i)[2] - points.get(i - 1)[2];
-                double dist = Math.sqrt(dx * dx + dy * dy);
-                totalDist += dist;
-                velocities.add(dist / dt);
-            }
-            for (int i = 1; i < velocities.size(); i++) accelerations.add(velocities.get(i) - velocities.get(i - 1));
-            for (int i = 1; i < accelerations.size(); i++) {
-                double j = accelerations.get(i) - accelerations.get(i - 1);
-                if (Double.isInfinite(j) || Double.isNaN(j)) j = JERK_CLAMP;
-                jerks.add(Math.min(Math.abs(j), JERK_CLAMP) * Math.signum(j));
-            }
-
-            double meanVel = velocities.stream().mapToDouble(v -> v).average().orElse(0);
-            double variance = velocities.stream().mapToDouble(v -> (v - meanVel) * (v - meanVel)).average().orElse(0);
-            double stdVel = Math.sqrt(variance);
-            double meanAcc = accelerations.isEmpty() ? 0 : accelerations.stream().mapToDouble(a -> a).average().orElse(0);
-            double meanJerk = jerks.isEmpty() ? 0 : jerks.stream().mapToDouble(j -> j).average().orElse(0);
-
-            double straight = Math.hypot(
-                    points.get(points.size() - 1)[1] - points.get(0)[1],
-                    points.get(points.size() - 1)[2] - points.get(0)[2]);
-            double pathEff = Math.min(straight / (totalDist + 1e-5), 1.0);
-            double duration = points.get(points.size() - 1)[0] - points.get(0)[0];
-
-            return new double[]{points.size(), duration, meanVel, stdVel, meanAcc, meanJerk, pathEff};
+            return BalabitValidationPipeline.computeFeatures(points);
         } catch (Exception e) {
             return null;
         }
@@ -189,7 +185,7 @@ public class FalsePositiveEvaluator {
     // 23 num_points, 24 duration_ms_delbot, 25 mean_velocity_delbot,
     // 26 std_velocity_delbot, 27 mean_acceleration, 28 mean_jerk, 29 path_efficiency
     // ---------------------------------------------------------------
-    private static void evaluateHumanReference(Instances trainingSchema, J48 tree) throws Exception {
+    private static void evaluateHumanReference(Instances trainingSchema, weka.classifiers.Classifier classifier) throws Exception {
         File csv = new File(HUMAN_REFERENCE_CSV);
         if (!csv.exists()) {
             throw new RuntimeException("Human reference CSV not found: " + csv.getAbsolutePath()
@@ -231,7 +227,7 @@ public class FalsePositiveEvaluator {
                 // class attribute left missing -- we are PREDICTING it, not
                 // supplying ground truth to the classifier.
 
-                double predicted = tree.classifyInstance(inst);
+                double predicted = classifier.classifyInstance(inst);
                 String predictedLabel = trainingSchema.classAttribute().value((int) predicted);
                 boolean isFalsePositive = predictedLabel.equals("1"); // predicted bot, but source is 100% human
 

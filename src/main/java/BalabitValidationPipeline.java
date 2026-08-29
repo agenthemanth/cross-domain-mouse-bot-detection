@@ -1,4 +1,4 @@
-import weka.classifiers.trees.J48;
+import weka.classifiers.trees.RandomForest;
 import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instance;
@@ -14,10 +14,26 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Validates the DELBOT-trained J48 model against the Balabit Mouse Dynamics
- * Challenge dataset (github.com/balabit/Mouse-Dynamics-Challenge) as a SECOND,
- * independent out-of-domain human-behavior dataset -- complementary to
- * FalsePositiveEvaluator's mightymerge check.
+ * Validates the DELBOT-trained Random Forest model against the Balabit Mouse
+ * Dynamics Challenge dataset (github.com/balabit/Mouse-Dynamics-Challenge) --
+ * an independent, out-of-domain, all-human dataset. This is the project's
+ * canonical cross-dataset false-positive evaluation: Balabit ships real raw
+ * (x, y, t), so its features are computed by the exact same code as DELBOT
+ * training. FalsePositiveEvaluator's mightymerge check is a rough sanity test
+ * only (no raw x/y -> mismatched features) and is not part of this story.
+ *
+ * Random Forest is the final classifier, selected after a documented
+ * head-to-head comparison against J48 (see project report). J48 remains in
+ * the report as the interpretable model used to catch an earlier data-
+ * leakage issue, but is no longer used in this pipeline going forward.
+ *
+ * CORRECTED RESULT (2026-08-28): Balabit human false-positive rate = 9.85%
+ * (2381 / 24182 gap-split chunks). The earlier "16.69% (J48) -> 1.07% (RF)"
+ * comparison was computed with a feature-pipeline bug (inter-sample dt was
+ * clamped to 1e-3 ms, and Balabit logs ~16.5% of samples at tied timestamps,
+ * inflating every kinematic feature by up to ~1e6x). Both of those numbers
+ * are retracted. The fix -- collapseToDistinctTimestamps() plus a 1 ms dt
+ * floor -- is below in computeFeatures().
  *
  * Why this dataset matters: unlike mightymerge (which only gives per-event
  * velocity/angle/distance, requiring reconstructed pseudo-features), Balabit
@@ -43,30 +59,37 @@ import java.util.TreeMap;
  */
 public class BalabitValidationPipeline {
 
-    private static final String DELBOT_DATA_DIR = "delbot_data";
-    private static final String BALABIT_DATA_DIR = "balabit_data"; // update if placed elsewhere
+    // Package-visible (not private) so BalabitCrossDomainEval reuses the IDENTICAL
+    // feature-extraction and segmentation code rather than copying it. Two copies of
+    // computeFeatures() would drift apart and silently make the FPR reported here
+    // non-comparable to the cross-domain numbers reported there.
+    static final String DELBOT_DATA_DIR = "delbot_data";
+    static final String BALABIT_DATA_DIR = "balabit_data"; // update if placed elsewhere
     private static final double JERK_CLAMP = 1e6;
-    private static final double GAP_THRESHOLD_SEC = 3.0;
-    private static final int MIN_POINTS_PER_SESSION = 20;
+    static final double GAP_THRESHOLD_SEC = 3.0;
+    static final int MIN_POINTS_PER_SESSION = 20;
 
     public static void main(String[] args) throws Exception {
-        System.out.println("--- STEP 1: TRAIN J48 ON DELBOT ONLY ---");
+        System.out.println("--- STEP 1: TRAIN RANDOM FOREST ON DELBOT ONLY ---");
         Instances trainingData = buildDelbotTrainingSet();
         System.out.println("DELBOT training instances: " + trainingData.numInstances());
 
-        J48 tree = new J48();
-        tree.setMinNumObj(20);
-        tree.setBinarySplits(true);
-        tree.buildClassifier(trainingData);
-        System.out.println("Model trained on DELBOT only.\n");
+        RandomForest rf = new RandomForest();
+        rf.setNumIterations(100);
+        rf.setSeed(1); // Weka's default is already 1; stated explicitly so the run is
+                       // provably reproducible and BalabitCrossDomainEval trains an
+                       // identical forest (both also rely on the deterministic file
+                       // ordering enforced in findSessionFolders / buildDelbotTrainingSet).
+        rf.buildClassifier(trainingData);
+        System.out.println("Random Forest trained (100 trees).\n");
 
         System.out.println("--- STEP 2: EVALUATE ON BALABIT (independent, real-coordinate human data) ---");
-        evaluateBalabit(trainingData, tree);
+        evaluateBalabit(trainingData, rf);
     }
 
     // ---------------- DELBOT training set (same schema as FalsePositiveEvaluator) ----------------
 
-    private static Instances buildDelbotTrainingSet() throws Exception {
+    static Instances buildDelbotTrainingSet() throws Exception {
         File dataDir = new File(DELBOT_DATA_DIR);
         List<File> sessionFolders = new ArrayList<>();
         findSessionFolders(dataDir, sessionFolders);
@@ -84,6 +107,11 @@ public class BalabitValidationPipeline {
             int label = folder.getName().startsWith("circles_human") ? 0 : 1;
             File[] files = folder.listFiles((d, n) -> n.endsWith(".txt"));
             if (files == null) continue;
+            // File.listFiles() gives no ordering guarantee, and the order training
+            // instances are added changes RandomForest's bootstrap samples (order-
+            // sensitive even at a fixed seed). Sort so the forest is identical run
+            // to run and across pipelines.
+            Arrays.sort(files);
             for (File f : files) {
                 double[] feat = parseDelbotSession(f);
                 if (feat == null) continue;
@@ -99,7 +127,7 @@ public class BalabitValidationPipeline {
         return data;
     }
 
-    private static ArrayList<Attribute> buildAttributeSchema() {
+    static ArrayList<Attribute> buildAttributeSchema() {
         ArrayList<Attribute> attrs = new ArrayList<>();
         attrs.add(new Attribute("num_points"));
         attrs.add(new Attribute("duration_ms"));
@@ -113,9 +141,10 @@ public class BalabitValidationPipeline {
         return attrs;
     }
 
-    private static void findSessionFolders(File dir, List<File> found) {
+    static void findSessionFolders(File dir, List<File> found) {
         File[] children = dir.listFiles(File::isDirectory);
         if (children == null) return;
+        Arrays.sort(children); // deterministic DFS order regardless of filesystem
         for (File child : children) {
             String name = child.getName();
             if (name.startsWith("circles_human") || name.startsWith("circles_bot")) {
@@ -127,36 +156,64 @@ public class BalabitValidationPipeline {
     }
 
     // Returns [num_points, duration_ms, mean_velocity, std_velocity, mean_acceleration, mean_jerk, path_efficiency]
-    // NOTE: explicitly rejects NaN/Infinite coordinates (DELBOT's "circleHide_*" files literally log the
-    // text "nan" while the cursor is hidden -- Double.parseDouble only accepts exact-case "NaN", so those
-    // rows correctly throw and get skipped here, same as the rest of malformed-line handling).
+    // NOTE on NaN handling: DELBOT's touch-input files (circles_human_tel, "*Touch" events) log the
+    // coordinate text "NaN" on the trailing ReleasedTouch rows while the cursor is hidden. Java's
+    // Double.parseDouble("NaN") does NOT throw -- it returns Double.NaN -- so those rows are parsed as
+    // NaN points, propagate into the aggregate features, and the whole session is then rejected by the
+    // isNaN/isInfinite guard at the end of computeFeatures(). Net effect: all 98 circles_human_tel
+    // sessions are excluded from the DELBOT training set (955 human -> 857), which is acceptable here
+    // (touch dynamics are a different modality from mouse) but IS a silent drop -- do not mistake it
+    // for a parse-exception skip.
     private static double[] parseDelbotSession(File file) {
         try {
-            List<double[]> points = new ArrayList<>();
-            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                String line;
-                boolean first = true;
-                while ((line = reader.readLine()) != null) {
-                    if (first) { first = false; continue; }
-                    String[] parts = line.split(",");
-                    if (parts.length != 4) continue;
-                    try {
-                        double t = Double.parseDouble(parts[0]);
-                        double x = Double.parseDouble(parts[2]);
-                        double y = Double.parseDouble(parts[3]);
-                        points.add(new double[]{t, x, y});
-                    } catch (NumberFormatException ignored) {
-                        // skips literal "nan" text and other malformed values
-                    }
-                }
-            }
-            return computeFeatures(points);
+            return computeFeatures(parseDelbotPoints(file));
         } catch (Exception e) {
             return null;
         }
     }
 
-    private static double[] computeFeatures(List<double[]> points) {
+    /**
+     * Raw (timestamp_ms, x, y) samples from one DELBOT session file, ascending in t.
+     * Package-visible so Tier2CrossDomainEval extracts its richer feature set from the
+     * SAME parsed points as the Tier-1 pipeline. See the NaN note above parseDelbotSession.
+     */
+    static List<double[]> parseDelbotPoints(File file) throws Exception {
+        List<double[]> points = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            boolean first = true;
+            while ((line = reader.readLine()) != null) {
+                if (first) { first = false; continue; }
+                String[] parts = line.split(",");
+                if (parts.length != 4) continue;
+                try {
+                    double t = Double.parseDouble(parts[0]);
+                    double x = Double.parseDouble(parts[2]);
+                    double y = Double.parseDouble(parts[3]);
+                    points.add(new double[]{t, x, y});
+                } catch (NumberFormatException ignored) {
+                    // skips literal "nan" text and other malformed values
+                }
+            }
+        }
+        return points;
+    }
+
+    /** Physical floor on the inter-sample gap (ms). 1000 Hz is about the fastest real
+     *  mouse polling rate, so anything below 1 ms is measurement noise, not motion. The
+     *  old floor was 1e-3 ms (1 microsecond), which turned tied timestamps into
+     *  ~1e6x-inflated velocities. */
+    private static final double MIN_DT_MS = 1.0;
+
+    static double[] computeFeatures(List<double[]> pointsRaw) {
+        // Balabit logs Move + Press/Drag/Release at the SAME record timestamp -- ~16.5%
+        // of consecutive raw samples have dt == 0. Fed into dist/dt (with any small
+        // floor) those produce velocities orders of magnitude outside the DELBOT
+        // training range, making every kinematic feature meaningless cross-domain.
+        // Collapsing each run of equal-timestamp samples to its final position puts
+        // Balabit on the same "one position per distinct instant" basis DELBOT already
+        // has (DELBOT has <0.1% tied samples, so this is a no-op there).
+        List<double[]> points = collapseToDistinctTimestamps(pointsRaw);
         if (points.size() < 3) return null;
 
         List<Double> velocities = new ArrayList<>();
@@ -165,7 +222,7 @@ public class BalabitValidationPipeline {
         double totalDist = 0.0;
 
         for (int i = 1; i < points.size(); i++) {
-            double dt = Math.max(points.get(i)[0] - points.get(i - 1)[0], 1e-3);
+            double dt = Math.max(points.get(i)[0] - points.get(i - 1)[0], MIN_DT_MS);
             double dx = points.get(i)[1] - points.get(i - 1)[1];
             double dy = points.get(i)[2] - points.get(i - 1)[2];
             double dist = Math.sqrt(dx * dx + dy * dy);
@@ -198,9 +255,25 @@ public class BalabitValidationPipeline {
         return result;
     }
 
+    /**
+     * Keeps the last sample within each run of consecutive equal-timestamp points.
+     * Input must be ascending in time (both DELBOT and Balabit parsers guarantee this).
+     * Package-visible so BalabitCrossDomainEval scores the human chunk and synthesises
+     * its bot twin from the SAME collapsed point list (keeps num_points matched).
+     */
+    static List<double[]> collapseToDistinctTimestamps(List<double[]> pts) {
+        if (pts.size() < 2) return pts;
+        List<double[]> out = new ArrayList<>(pts.size());
+        for (int i = 0; i < pts.size(); i++) {
+            if (i + 1 < pts.size() && pts.get(i + 1)[0] == pts.get(i)[0]) continue;
+            out.add(pts.get(i));
+        }
+        return out;
+    }
+
     // ---------------- Balabit parsing + gap-based segmentation + evaluation ----------------
 
-    private static void evaluateBalabit(Instances trainingSchema, J48 tree) throws Exception {
+    private static void evaluateBalabit(Instances trainingSchema, weka.classifiers.Classifier classifier) throws Exception {
         File dataDir = new File(BALABIT_DATA_DIR);
         if (!dataDir.exists()) {
             throw new RuntimeException("Balabit data not found at " + dataDir.getAbsolutePath()
@@ -219,7 +292,11 @@ public class BalabitValidationPipeline {
             String userFolder = file.getParentFile().getName(); // e.g. "user7"
             List<double[]> rawPoints = parseBalabitFile(file); // (t_sec, x, y)
 
-            for (List<double[]> chunk : splitByGap(rawPoints, GAP_THRESHOLD_SEC)) {
+            for (List<double[]> chunkRaw : splitByGap(rawPoints, GAP_THRESHOLD_SEC)) {
+                // Collapse tied timestamps FIRST, then require MIN_POINTS distinct-time
+                // samples -- a "session" of e.g. 5 real samples is not a usable trajectory
+                // and its features fall outside the DELBOT training range.
+                List<double[]> chunk = collapseToDistinctTimestamps(chunkRaw);
                 if (chunk.size() < MIN_POINTS_PER_SESSION) continue;
 
                 // Convert seconds -> milliseconds to match DELBOT's units before feature computation
@@ -233,7 +310,7 @@ public class BalabitValidationPipeline {
                 inst.setDataset(trainingSchema);
                 for (int i = 0; i < feat.length; i++) inst.setValue(i, feat[i]);
 
-                double predicted = tree.classifyInstance(inst);
+                double predicted = classifier.classifyInstance(inst);
                 String predictedLabel = trainingSchema.classAttribute().value((int) predicted);
                 boolean isFalsePositive = predictedLabel.equals("1"); // predicted bot, but source is 100% human
 
@@ -265,16 +342,23 @@ public class BalabitValidationPipeline {
             System.out.printf("%-10s %10d %10d %9.2f%%%n", e.getKey(), c[0], c[1], userFpr);
         }
 
-        System.out.println("\n--- COMPARISON TO MIGHTYMERGE (run FalsePositiveEvaluator for that number) ---");
-        System.out.println("mightymerge.io FPR was 2.18% (browsing-style human behavior).");
-        System.out.println("Balabit FPR above reflects continuous administrative/work-task mouse behavior --");
-        System.out.println("a genuinely different behavioral context. A gap between these two numbers is a");
-        System.out.println("real, reportable finding about generalization boundaries, not a bug.");
+        System.out.println("\n--- THIS IS THE PROJECT'S CROSS-DATASET FALSE-POSITIVE RESULT ---");
+        System.out.println("Balabit provides real raw (x, y, t), so every kinematic feature is computed");
+        System.out.println("exactly the way DELBOT training computes it -- one feature-code path end to end.");
+        System.out.println("The mightymerge check (FalsePositiveEvaluator) is a rough sanity test only:");
+        System.out.println("it has no raw x/y, so 3 of 7 features are on mismatched scales train vs test,");
+        System.out.println("and it is NOT part of the cross-dataset story (methodology decision, 2026-08-28).");
+        System.out.println("The Balabit FPR reflects continuous administrative/work-task mouse behavior --");
+        System.out.println("an out-of-domain context relative to DELBOT's few-second circle-drawing tasks.");
     }
 
-    private static void findBalabitFiles(File dir, List<File> found) {
+    static void findBalabitFiles(File dir, List<File> found) {
         File[] children = dir.listFiles();
         if (children == null) return;
+        // Order does not affect the per-chunk scores or the aggregate metrics, but
+        // keeping it deterministic makes progress logs stable and guards any future
+        // order-sensitive change.
+        Arrays.sort(children);
         for (File child : children) {
             if (child.isDirectory()) {
                 findBalabitFiles(child, found);
@@ -285,7 +369,7 @@ public class BalabitValidationPipeline {
     }
 
     // Returns list of (record_timestamp_seconds, x, y)
-    private static List<double[]> parseBalabitFile(File file) {
+    static List<double[]> parseBalabitFile(File file) {
         List<double[]> points = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
@@ -308,7 +392,48 @@ public class BalabitValidationPipeline {
         return points;
     }
 
-    private static List<List<double[]>> splitByGap(List<double[]> points, double gapThresholdSec) {
+    /** State codes returned by {@link #parseBalabitEvents}. */
+    static final int EV_MOVE = 0, EV_PRESSED = 1, EV_RELEASED = 2, EV_DRAG = 3, EV_OTHER = 4;
+
+    /**
+     * Full Balabit event stream as (record_timestamp_seconds, x, y, stateCode),
+     * ascending in t. Unlike parseBalabitFile this keeps the press/release/drag
+     * structure so BalabitActionSegmenter can cut the stream into typed mouse
+     * actions (move / point-click / drag-drop) instead of blind 3s-gap chunks.
+     */
+    static List<double[]> parseBalabitEvents(File file) {
+        List<double[]> events = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            boolean first = true;
+            while ((line = reader.readLine()) != null) {
+                if (first) { first = false; continue; } // header
+                String[] parts = line.split(",");
+                if (parts.length < 6) continue;
+                try {
+                    double t = Double.parseDouble(parts[0].trim());
+                    String state = parts[3].trim();
+                    double x = Double.parseDouble(parts[4].trim());
+                    double y = Double.parseDouble(parts[5].trim());
+                    int code;
+                    switch (state) {
+                        case "Move":     code = EV_MOVE; break;
+                        case "Pressed":  code = EV_PRESSED; break;
+                        case "Released": code = EV_RELEASED; break;
+                        case "Drag":     code = EV_DRAG; break;
+                        default:         code = EV_OTHER; break; // Scroll Up/Down etc.
+                    }
+                    events.add(new double[]{t, x, y, code});
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        } catch (Exception e) {
+            // skip unreadable file
+        }
+        return events;
+    }
+
+    static List<List<double[]>> splitByGap(List<double[]> points, double gapThresholdSec) {
         List<List<double[]>> sessions = new ArrayList<>();
         List<double[]> current = new ArrayList<>();
         for (int i = 0; i < points.size(); i++) {

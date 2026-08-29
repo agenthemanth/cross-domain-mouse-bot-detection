@@ -1,24 +1,25 @@
-TRAIN users [user12, user16, user21, user29, user7] (12483 chunks)
+﻿TRAIN users [user12, user16, user21, user29, user7] (12483 chunks)
 TEST  users [user15, user20, user23, user35, user9] (11699 chunks)
 
-[BASELINE  DELBOT_ONLY   ] trainN=3453    humFPR=11.05%  |  vs NAIVE: AUC=0.4559 TPR@<=1%=0.01%  |  vs ADVERSARIAL: AUC=0.4700 TPR@<=1%=1.81% EER=50.88%
-[BASELINE  AUG_NAIVE     ] trainN=28419   humFPR= 1.00%  |  vs NAIVE: AUC=0.9996 TPR@<=1%=99.48%  |  vs ADVERSARIAL: AUC=0.5133 TPR@<=1%=0.74% EER=48.60%
-[BASELINE  AUG_NAIVE_PLUS] trainN=40880   humFPR=30.71%  |  vs NAIVE: AUC=0.9968 TPR@<=1%=96.88%  |  vs ADVERSARIAL: AUC=0.8018 TPR@<=1%=8.77% EER=27.26%
+WARNING: core mtj jar files are not available as resources to this classloader (jdk.internal.loader.ClassLoaders$AppClassLoader@105be200)
+[BASELINE  DELBOT_ONLY   ] trainN=3453    humFPR=10.85%  |  vs NAIVE: AUC=0.3600 TPR@<=1%=0.01%  |  vs ADVERSARIAL: AUC=0.4859 TPR@<=1%=1.97% EER=50.51%
+[BASELINE  AUG_NAIVE     ] trainN=28419   humFPR= 0.97%  |  vs NAIVE: AUC=0.9997 TPR@<=1%=99.48%  |  vs ADVERSARIAL: AUC=0.5222 TPR@<=1%=0.75% EER=47.71%
+[BASELINE  AUG_NAIVE_PLUS] trainN=40880   humFPR=30.93%  |  vs NAIVE: AUC=0.9965 TPR@<=1%=96.39%  |  vs ADVERSARIAL: AUC=0.8004 TPR@<=1%=7.44% EER=27.60%
 
-[AUGMENTED DELBOT_ONLY   ] trainN=3453    humFPR=25.72%  |  vs NAIVE: AUC=0.4069 TPR@<=1%=0.01%  |  vs ADVERSARIAL: AUC=0.3685 TPR@<=1%=0.54% EER=57.64%
-[AUGMENTED AUG_NAIVE     ] trainN=28419   humFPR= 0.33%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.98%  |  vs ADVERSARIAL: AUC=0.5222 TPR@<=1%=0.53% EER=47.63%
-[AUGMENTED AUG_NAIVE_PLUS] trainN=40880   humFPR=12.39%  |  vs NAIVE: AUC=0.9995 TPR@<=1%=99.48%  |  vs ADVERSARIAL: AUC=0.9643 TPR@<=1%=58.29% EER=10.30%
+[AUGMENTED DELBOT_ONLY   ] trainN=3453    humFPR=30.39%  |  vs NAIVE: AUC=0.4383 TPR@<=1%=0.00%  |  vs ADVERSARIAL: AUC=0.3757 TPR@<=1%=0.39% EER=56.32%
+[AUGMENTED AUG_NAIVE     ] trainN=28419   humFPR= 0.36%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.97%  |  vs ADVERSARIAL: AUC=0.5257 TPR@<=1%=0.57% EER=47.23%
+[AUGMENTED AUG_NAIVE_PLUS] trainN=40880   humFPR=12.30%  |  vs NAIVE: AUC=0.9995 TPR@<=1%=99.45%  |  vs ADVERSARIAL: AUC=0.9649 TPR@<=1%=58.28% EER=10.15%
 
 ========================================================================
  TIER 4 -- EVASIVE BOT  (held-out Balabit users)
 ========================================================================
 feat      trainset         humFPR |  naiveAUC naiveTPR@1% |    advAUC  advTPR@1%    advEER
-BASELINE  DELBOT_ONLY      11.05% |    0.4559      0.01% |    0.4700      1.81%    50.88%
-BASELINE  AUG_NAIVE         1.00% |    0.9996     99.48% |    0.5133      0.74%    48.60%
-BASELINE  AUG_NAIVE_PLUS   30.71% |    0.9968     96.88% |    0.8018      8.77%    27.26%
-AUGMENTED DELBOT_ONLY      25.72% |    0.4069      0.01% |    0.3685      0.54%    57.64%
-AUGMENTED AUG_NAIVE         0.33% |    0.9999     99.98% |    0.5222      0.53%    47.63%
-AUGMENTED AUG_NAIVE_PLUS   12.39% |    0.9995     99.48% |    0.9643     58.29%    10.30%
+BASELINE  DELBOT_ONLY      10.85% |    0.3600      0.01% |    0.4859      1.97%    50.51%
+BASELINE  AUG_NAIVE         0.97% |    0.9997     99.48% |    0.5222      0.75%    47.71%
+BASELINE  AUG_NAIVE_PLUS   30.93% |    0.9965     96.39% |    0.8004      7.44%    27.60%
+AUGMENTED DELBOT_ONLY      30.39% |    0.4383      0.00% |    0.3757      0.39%    56.32%
+AUGMENTED AUG_NAIVE         0.36% |    0.9999     99.97% |    0.5257      0.57%    47.23%
+AUGMENTED AUG_NAIVE_PLUS   12.30% |    0.9995     99.45% |    0.9649     58.28%    10.15%
 
 AUG_NAIVE vs advAUC = does the Tier-2 winner generalise to an evasive bot it
 never trained on. AUG_NAIVE_PLUS = adversarial bots added to training too.

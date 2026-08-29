@@ -123,10 +123,11 @@ public class Tier4AdversarialEval {
         System.out.println("construction; residual tells are accel/jerk ORDER and slightly-too-smooth curvature.");
         System.out.println();
         System.out.println("FEATURE MODES: BASELINE 7 | AUGMENTED +11 | SCALEFREE drops absolute-magnitude");
-        System.out.println("features | *_SEQ adds 2 temporal-ordering features (velocity_lag1_autocorr,");
-        System.out.println("velocity_step_roughness) that read the step-order the shuffled evasive bot");
-        System.out.println("destroys. Only the AUG_NAIVE_PLUS rows can move -- the RF must SEE the shuffled");
-        System.out.println("signature labelled bot to use it; AUG_NAIVE stays coin-flip in every mode.");
+        System.out.println("features (loses -- normalisation is not the lever) | *_SEQ adds 2 temporal-");
+        System.out.println("ordering features. Per Tier6FeatureProbe the *_SEQ gain over AUGMENTED is");
+        System.out.println("marginal (advAUC +~0.0014, real vs RF-seed noise but practically ~0) and comes");
+        System.out.println("from step_roughness, not autocorrelation -- Balabit gap-chunk human step-speed");
+        System.out.println("is near-i.i.d. Only AUG_NAIVE_PLUS rows can move; AUG_NAIVE is coin-flip in every mode.");
     }
 
     // ---------------- training ----------------

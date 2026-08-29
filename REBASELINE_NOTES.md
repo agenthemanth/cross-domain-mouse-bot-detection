@@ -54,6 +54,13 @@ control, the before/after above was measured directly by `git stash` toggling on
 `BalabitCrossDomainEval` / `BalabitValidationPipeline` / `FalsePositiveEvaluator`,
 which are the frozen, reproducible references. Tool and its result file removed.
 
+### STALE: TIER1-4_EVALUATION.html
+That review page (committed in 62fe5d9) quotes PRE-rescale numbers throughout
+(0.5326, 9.85%, 12.39%) and still discusses the retracted 1.07% FPR. It is the
+paper-facing document, so anyone quoting from it will quote stale figures. Not
+updated in this pass -- update it deliberately against the post-rescale result
+files and Tier 5/6 before it feeds the paper.
+
 ### Still open (unchanged by this)
 - Raw max velocity ~1277 px/ms (1 ms dt floor too coarse for large jumps) — a
   deliberate, announced Tier-1 re-baseline, not done here.

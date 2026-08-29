@@ -1,0 +1,36 @@
+﻿TRAIN users [user12, user16, user21, user29, user7] (12483 chunks)
+TEST  users [user15, user20, user23, user35, user9] (11699 chunks)
+
+========================================================================
+ A. SEQ FEATURE DISTRIBUTIONS  (held-out test users)
+========================================================================
+group / feature                   n     mean   median      std
+human    velocity_lag1_autocorr    11699   0.0488  -0.0144   0.1781
+adversar velocity_lag1_autocorr    11673   0.0002  -0.0198   0.1168
+naive    velocity_lag1_autocorr    46796   0.6798   0.7511   0.2408
+human    velocity_step_roughness    11699   1.5370   1.6742   0.4213
+adversar velocity_step_roughness    11673   1.6625   1.7299   0.2921
+naive    velocity_step_roughness    46796   0.2370   0.1569   0.1929
+
+single-feature ROC-AUC (human vs adversarial):  lag1_autocorr=0.4482   step_roughness=0.5654
+(AUC here = P(adversarial scores 'more bot' than human). For lag1_autocorr the bot
+ is LOWER so its discriminating AUC is 1 - value; roughness the bot is higher.)
+
+========================================================================
+ B. RF SEED VARIANCE  -- Tier-4 AUG_NAIVE_PLUS, evasive bot
+========================================================================
+feat mode          seed |    advAUC    advEER  advTPR@<=1%
+WARNING: core mtj jar files are not available as resources to this classloader (jdk.internal.loader.ClassLoaders$AppClassLoader@105be200)
+AUGMENTED             1 |    0.9649    10.15%       58.28%
+AUGMENTED             2 |    0.9647    10.27%       58.15%
+AUGMENTED             3 |    0.9646    10.23%       56.41%
+AUGMENTED            -- | across-seed advAUC spread = 0.0003  (min 0.9646 max 0.9649)
+
+AUGMENTED_SEQ         1 |    0.9662     9.93%       59.61%
+AUGMENTED_SEQ         2 |    0.9663     9.92%       59.40%
+AUGMENTED_SEQ         3 |    0.9662    10.08%       59.33%
+AUGMENTED_SEQ        -- | across-seed advAUC spread = 0.0001  (min 0.9662 max 0.9663)
+
+VERDICT RULE: if (AUGMENTED_SEQ mean advAUC - AUGMENTED mean advAUC) is not larger
+than the bigger of the two across-seed spreads, the 2 features add nothing
+detectable at this sample size -- report as a null result, not an improvement.

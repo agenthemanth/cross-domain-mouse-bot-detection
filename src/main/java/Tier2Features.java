@@ -75,14 +75,21 @@ public final class Tier2Features {
      * construction. These two read the ORDER the earlier features throw away:
      *
      *   velocity_lag1_autocorr  -- Pearson autocorrelation of the speed series at
-     *       lag 1. Real cursor motion accelerates and decelerates smoothly, so
-     *       consecutive step speeds are strongly correlated (typ. 0.3-0.8). A
-     *       random permutation of the same speeds has expected autocorrelation ~0.
-     *   velocity_step_roughness -- mean|v[i]-v[i-1]| / mean(v). Same multiset of
-     *       speeds, but a shuffled order maximises the average successive jump,
-     *       so this runs high for the shuffled bot and low for smooth human motion.
+     *       lag 1, over moving steps.
+     *   velocity_step_roughness -- mean|v[i]-v[i-1]| / mean(v) over moving steps.
      *
-     * Both are dimensionless. A chunk with < 3 moving steps yields (0, 0).
+     * Both dimensionless; < 4 moving steps -> (0, 0).
+     *
+     * MEASURED OUTCOME (Tier6FeatureProbe, tier6_feature_probe_results.txt): the
+     * autocorrelation idea largely FAILS on Balabit gap-chunks -- human step-speed
+     * autocorr is ~0 (median -0.014, i.e. the series is near-i.i.d. at this 13.6s /
+     * 66-pt multi-action segmentation), statistically indistinguishable from the
+     * shuffled bot. Single-feature human-vs-adversarial AUC: lag1_autocorr 0.45
+     * (chance), step_roughness 0.57 (weak, correct direction). Net Tier-4 effect of
+     * adding both to AUGMENTED: advAUC +0.0014 (real vs 0.0003 RF-seed spread),
+     * ~+1.5pp recall@<=1%FPR, ~no human-FPR cost -- a marginal, mostly-step_roughness
+     * gain, kept because it is free, NOT a fix. lag1_autocorr does cleanly separate
+     * the SMOOTH naive Bezier/min-jerk bots (autocorr ~0.68), which are already caught.
      */
     static final String[] SEQ_NAMES = { "velocity_lag1_autocorr", "velocity_step_roughness" };
 
@@ -176,28 +183,40 @@ public final class Tier2Features {
         List<double[]> p = BalabitValidationPipeline.collapseToDistinctTimestamps(pointsMs);
         int n = p.size();
         if (n < 4) return null;
-        int nSteps = n - 1;
-        double[] v = new double[nSteps];
+
+        // Speed sequence over MOVING steps only (matches tier2() / velocityTailRatio).
+        // Balabit chunks carry a median ~9% and up to ~58% zero-displacement steps; left
+        // in, the lag-1 autocorrelation is dominated by the run pattern of zeros for BOTH
+        // humans and the shuffled bot, which flattens the very discrimination this targets.
+        double[] all = new double[n - 1];
+        int moving = 0;
         for (int i = 1; i < n; i++) {
             double dt = Math.max(p.get(i)[0] - p.get(i - 1)[0], MIN_DT_MS);
             double ddx = p.get(i)[1] - p.get(i - 1)[1];
             double ddy = p.get(i)[2] - p.get(i - 1)[2];
-            v[i - 1] = Math.sqrt(ddx * ddx + ddy * ddy) / dt;
+            double s = Math.sqrt(ddx * ddx + ddy * ddy) / dt;
+            all[i - 1] = s;
+            if (s > 0.0) moving++;
         }
+        if (moving < 4) return new double[]{0.0, 0.0};
+        double[] v = new double[moving];
+        int w = 0;
+        for (double s : all) if (s > 0.0) v[w++] = s;
+
         double meanV = mean(v);
-        if (meanV <= EPS || nSteps < 3) return new double[]{0.0, 0.0};
+        if (meanV <= EPS) return new double[]{0.0, 0.0};
 
         double num = 0.0, den = 0.0;
-        for (int i = 0; i < nSteps; i++) {
+        for (int i = 0; i < v.length; i++) {
             double d = v[i] - meanV;
             den += d * d;
-            if (i > 0) num += (v[i] - meanV) * (v[i - 1] - meanV);
+            if (i > 0) num += d * (v[i - 1] - meanV);
         }
         double lag1 = den > EPS ? num / den : 0.0;
 
         double roughSum = 0.0;
-        for (int i = 1; i < nSteps; i++) roughSum += Math.abs(v[i] - v[i - 1]);
-        double roughness = roughSum / ((nSteps - 1) * meanV);
+        for (int i = 1; i < v.length; i++) roughSum += Math.abs(v[i] - v[i - 1]);
+        double roughness = roughSum / ((v.length - 1) * meanV);
 
         if (Double.isNaN(lag1) || Double.isInfinite(lag1)
                 || Double.isNaN(roughness) || Double.isInfinite(roughness)) return null;

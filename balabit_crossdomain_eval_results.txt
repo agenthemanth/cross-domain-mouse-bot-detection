@@ -34,13 +34,13 @@ Synthetic ADVANCED_BEZIER_VP_JITTER bot chunks scored: 24182
 ========================================================================
  CROSS-DOMAIN (Balabit) TWO-SIDED EVALUATION
 ========================================================================
-Human false positive rate @0.5 threshold : 9.85%  (2381 / 24182)
+Human false positive rate @0.5 threshold : 9.79%  (2368 / 24182)
 (cross-check: identical to BalabitValidationPipeline's Balabit FPR --
  same DELBOT training, same forest, same tie-to-human 0.5 convention)
 
 --- FIXED OPERATING POINTS (threshold chosen on humans, applied to all bots) ---
-  target FPR 1%  ->  bot-probability threshold 0.8400  (achieved human FPR 0.98%)
-  target FPR 5%  ->  bot-probability threshold 0.6100  (achieved human FPR 4.90%)
+  target FPR 1%  ->  bot-probability threshold 0.8600  (achieved human FPR 0.95%)
+  target FPR 5%  ->  bot-probability threshold 0.6000  (achieved human FPR 4.89%)
 
 ------------------------------------------------------------------------
  BOT TYPE: MODERATE_LINEAR
@@ -48,12 +48,12 @@ Human false positive rate @0.5 threshold : 9.85%  (2381 / 24182)
 Confusion matrix @0.5   (rows = truth, cols = predicted)
                pred BOT   pred HUMAN
   actual BOT           1       24181
-  actual HUMAN      2381       21801
+  actual HUMAN      2368       21814
 TPR (bot recall) @0.5 : 0.00%
-FPR               @0.5 : 9.85%
-Balanced accuracy @0.5 : 45.08%
-ROC-AUC               : 0.5591
-Equal Error Rate      : 46.59%
+FPR               @0.5 : 9.79%
+Balanced accuracy @0.5 : 45.11%
+ROC-AUC               : 0.4759
+Equal Error Rate      : 54.67%
 TPR @ <=1% FPR       : 0.00%
 TPR @ <=5% FPR       : 0.00%
 
@@ -63,12 +63,12 @@ TPR @ <=5% FPR       : 0.00%
 Confusion matrix @0.5   (rows = truth, cols = predicted)
                pred BOT   pred HUMAN
   actual BOT           1       24181
-  actual HUMAN      2381       21801
+  actual HUMAN      2368       21814
 TPR (bot recall) @0.5 : 0.00%
-FPR               @0.5 : 9.85%
-Balanced accuracy @0.5 : 45.08%
-ROC-AUC               : 0.4825
-Equal Error Rate      : 51.30%
+FPR               @0.5 : 9.79%
+Balanced accuracy @0.5 : 45.11%
+ROC-AUC               : 0.4746
+Equal Error Rate      : 54.47%
 TPR @ <=1% FPR       : 0.00%
 TPR @ <=5% FPR       : 0.00%
 
@@ -77,52 +77,52 @@ TPR @ <=5% FPR       : 0.00%
 ------------------------------------------------------------------------
 Confusion matrix @0.5   (rows = truth, cols = predicted)
                pred BOT   pred HUMAN
-  actual BOT          27       24155
-  actual HUMAN      2381       21801
-TPR (bot recall) @0.5 : 0.11%
-FPR               @0.5 : 9.85%
-Balanced accuracy @0.5 : 45.13%
-ROC-AUC               : 0.5690
-Equal Error Rate      : 45.42%
+  actual BOT          29       24153
+  actual HUMAN      2368       21814
+TPR (bot recall) @0.5 : 0.12%
+FPR               @0.5 : 9.79%
+Balanced accuracy @0.5 : 45.16%
+ROC-AUC               : 0.4175
+Equal Error Rate      : 55.37%
 TPR @ <=1% FPR       : 0.00%
-TPR @ <=5% FPR       : 0.07%
+TPR @ <=5% FPR       : 0.08%
 
 ------------------------------------------------------------------------
  BOT TYPE: ADVANCED_BEZIER_VP_JITTER
 ------------------------------------------------------------------------
 Confusion matrix @0.5   (rows = truth, cols = predicted)
                pred BOT   pred HUMAN
-  actual BOT         353       23829
-  actual HUMAN      2381       21801
-TPR (bot recall) @0.5 : 1.46%
-FPR               @0.5 : 9.85%
-Balanced accuracy @0.5 : 45.81%
-ROC-AUC               : 0.5196
-Equal Error Rate      : 48.16%
+  actual BOT           2       24180
+  actual HUMAN      2368       21814
+TPR (bot recall) @0.5 : 0.01%
+FPR               @0.5 : 9.79%
+Balanced accuracy @0.5 : 45.11%
+ROC-AUC               : 0.3989
+Equal Error Rate      : 55.95%
 TPR @ <=1% FPR       : 0.00%
-TPR @ <=5% FPR       : 0.76%
+TPR @ <=5% FPR       : 0.00%
 
 ------------------------------------------------------------------------
  ALL BOT TYPES POOLED
 ------------------------------------------------------------------------
-ROC-AUC               : 0.5326
-Equal Error Rate      : 47.26%
-TPR @0.5 threshold    : 0.39%
+ROC-AUC               : 0.4417
+Equal Error Rate      : 54.63%
+TPR @0.5 threshold    : 0.03%
 TPR @ <=1% FPR       : 0.00%
-TPR @ <=5% FPR       : 0.21%
+TPR @ <=5% FPR       : 0.02%
 
 --- HUMAN FALSE POSITIVE RATE BY USER (@0.5) ---
 user           chunks        FPs       FPR%
-user12           4557        342      7.50%
-user15           3702        509     13.75%
-user16           2810        256      9.11%
-user20           1701        151      8.88%
-user21           1505        168     11.16%
-user23           2047        156      7.62%
-user29           1821        149      8.18%
-user35           2403        279     11.61%
-user7            1790        173      9.66%
-user9            1846        198     10.73%
+user12           4557        354      7.77%
+user15           3702        503     13.59%
+user16           2810        255      9.07%
+user20           1701        150      8.82%
+user21           1505        176     11.69%
+user23           2047        163      7.96%
+user29           1821        143      7.85%
+user35           2403        276     11.49%
+user7            1790        171      9.55%
+user9            1846        177      9.59%
 
 NOTE: bots here are SYNTHESISED from published movement models, not
 captured bot traffic, and do not include GAN-generated trajectories.

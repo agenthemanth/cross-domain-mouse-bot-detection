@@ -150,29 +150,15 @@ public class FalsePositiveEvaluator {
     }
 
     // Returns [num_points, duration_ms, mean_velocity, std_velocity, mean_acceleration, mean_jerk, path_efficiency]
-    // Feature math is delegated to BalabitValidationPipeline.computeFeatures so the
-    // DELBOT training set here is IDENTICAL to the one used by BalabitValidationPipeline
-    // and BalabitCrossDomainEval -- including the tied-timestamp collapse and the 1 ms
-    // dt floor. (The old inline copy clamped dt to 1e-3 ms; see that file's comment.)
+    // BOTH parsing and feature math are delegated to BalabitValidationPipeline so the DELBOT
+    // training set here is IDENTICAL to the one used by BalabitValidationPipeline and
+    // BalabitCrossDomainEval -- tied-timestamp collapse, 1 ms dt floor, NaN rejection AND the
+    // circles_human_fast normalised-coordinate rescale. (An earlier inline copy of the parse
+    // loop missed that last one, which silently gave this pipeline different training data.)
     private static double[] parseDelbotSession(File file) {
         try {
-            List<double[]> points = new ArrayList<>();
-            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                String line;
-                boolean first = true;
-                while ((line = reader.readLine()) != null) {
-                    if (first) { first = false; continue; }
-                    String[] parts = line.split(",");
-                    if (parts.length != 4) continue;
-                    try {
-                        double t = Double.parseDouble(parts[0]);
-                        double x = Double.parseDouble(parts[2]);
-                        double y = Double.parseDouble(parts[3]);
-                        points.add(new double[]{t, x, y});
-                    } catch (NumberFormatException ignored) {}
-                }
-            }
-            return BalabitValidationPipeline.computeFeatures(points);
+            return BalabitValidationPipeline.computeFeatures(
+                    BalabitValidationPipeline.parseDelbotPoints(file));
         } catch (Exception e) {
             return null;
         }

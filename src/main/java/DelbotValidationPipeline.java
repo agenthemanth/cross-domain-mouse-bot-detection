@@ -212,24 +212,11 @@ public class DelbotValidationPipeline {
 
     private static SessionFeatures parseSession(File file, int label) {
         try {
-            List<double[]> points = new ArrayList<>(); // [timestamp, x, y]
-            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                String line;
-                boolean first = true;
-                while ((line = reader.readLine()) != null) {
-                    if (first) { first = false; continue; } // skip "resolution:W,H" header line
-                    String[] parts = line.split(",");
-                    if (parts.length != 4) continue;
-                    try {
-                        double t = Double.parseDouble(parts[0]);
-                        double x = Double.parseDouble(parts[2]);
-                        double y = Double.parseDouble(parts[3]);
-                        points.add(new double[]{t, x, y});
-                    } catch (NumberFormatException ignored) {
-                        // skip malformed line
-                    }
-                }
-            }
+            // Parsing is delegated to BalabitValidationPipeline.parseDelbotPoints so this
+            // in-domain pipeline reads the SAME DELBOT rows as the cross-dataset ones --
+            // including the circles_human_fast normalised-coordinate rescale, which an
+            // inline parse loop here previously missed.
+            List<double[]> points = BalabitValidationPipeline.parseDelbotPoints(file);
             if (points.size() < 3) return null;
 
             List<Double> velocities = new ArrayList<>();

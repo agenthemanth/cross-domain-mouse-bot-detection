@@ -27,13 +27,25 @@ import java.util.TreeMap;
  * the report as the interpretable model used to catch an earlier data-
  * leakage issue, but is no longer used in this pipeline going forward.
  *
- * CORRECTED RESULT (2026-08-28): Balabit human false-positive rate = 9.85%
- * (2381 / 24182 gap-split chunks). The earlier "16.69% (J48) -> 1.07% (RF)"
- * comparison was computed with a feature-pipeline bug (inter-sample dt was
- * clamped to 1e-3 ms, and Balabit logs ~16.5% of samples at tied timestamps,
- * inflating every kinematic feature by up to ~1e6x). Both of those numbers
- * are retracted. The fix -- collapseToDistinctTimestamps() plus a 1 ms dt
- * floor -- is below in computeFeatures().
+ * RESULT HISTORY -- read before quoting any number from this pipeline:
+ *  - The original "16.69% (J48) -> 1.07% (RF)" comparison is RETRACTED. It was
+ *    computed with a feature-pipeline bug: inter-sample dt was clamped to
+ *    1e-3 ms and Balabit logs ~16.5% of samples at tied timestamps, inflating
+ *    every kinematic feature by up to ~1e6x. Fixed by
+ *    collapseToDistinctTimestamps() plus a 1 ms dt floor (see computeFeatures).
+ *  - 2026-08-28 baseline after that fix: Balabit human FPR = 9.85%
+ *    (2381 / 24182 gap-split chunks).
+ *  - 2026-08-30 RE-BASELINE: parseDelbotPoints now rescales the 9
+ *    circles_human_fast files, whose coordinates are screen fractions in [0,1]
+ *    rather than pixels (their velocities were ~1087x too small, so 9 of 3453
+ *    training rows carried meaningless near-stationary values). This changes the
+ *    TRAINING set, so it moves every downstream number. Measured before/after
+ *    (git-stash toggle on the frozen reference tools):
+ *        Balabit human FPR            9.85% -> 9.79%
+ *        mightymerge micro-avg FPR    5.45% -> 5.28%
+ *        cross-domain pooled bot AUC  0.5326 -> 0.4417
+ *    No qualitative conclusion changes (transfer was, and remains, absent).
+ *    Full log: REBASELINE_NOTES.md. The 9.85% figure above is PRE-rescale.
  *
  * Why this dataset matters: unlike mightymerge (which only gives per-event
  * velocity/angle/distance, requiring reconstructed pseudo-features), Balabit
@@ -176,9 +188,22 @@ public class BalabitValidationPipeline {
      * Raw (timestamp_ms, x, y) samples from one DELBOT session file, ascending in t.
      * Package-visible so Tier2CrossDomainEval extracts its richer feature set from the
      * SAME parsed points as the Tier-1 pipeline. See the NaN note above parseDelbotSession.
+     *
+     * NORMALISED-COORDINATE FIX (2026-08-30, changes the Tier-1 baseline -- see the class
+     * Javadoc's re-baseline note): the 9 files in circles_human_fast store coordinates as
+     * FRACTIONS OF THE SCREEN in [0,1] while every other DELBOT folder stores pixels. Left
+     * as-is their velocities are ~1087x too small (mean_velocity 0.0066 vs 0.376 median for
+     * other DELBOT humans) -- they are not "slow humans", the unit is screens/ms rather than
+     * px/ms, so those 9 of 857 human training rows were meaningless. Each file carries a
+     * "resolution:W,H" header, so when every coordinate in a file lies inside the unit square
+     * while the header reports a W x H screen, the coordinates are unambiguously normalised
+     * and are scaled back to pixels. Verified: this folder is the only one affected, and its
+     * headers vary per file (1536x864 and 1536x754), so the scale must be read per file.
      */
     static List<double[]> parseDelbotPoints(File file) throws Exception {
+        double[] screen = parseResolutionHeader(file); // {W, H}, or null if absent/unparseable
         List<double[]> points = new ArrayList<>();
+        double maxAbsX = 0, maxAbsY = 0;
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
             boolean first = true;
@@ -191,12 +216,31 @@ public class BalabitValidationPipeline {
                     double x = Double.parseDouble(parts[2]);
                     double y = Double.parseDouble(parts[3]);
                     points.add(new double[]{t, x, y});
+                    if (!Double.isNaN(x)) maxAbsX = Math.max(maxAbsX, Math.abs(x));
+                    if (!Double.isNaN(y)) maxAbsY = Math.max(maxAbsY, Math.abs(y));
                 } catch (NumberFormatException ignored) {
                     // skips literal "nan" text and other malformed values
                 }
             }
         }
+        if (screen != null && screen[0] > 1.0 && screen[1] > 1.0
+                && maxAbsX > 0 && maxAbsY > 0 && maxAbsX <= 1.0 && maxAbsY <= 1.0) {
+            for (double[] p : points) { p[1] *= screen[0]; p[2] *= screen[1]; }
+        }
         return points;
+    }
+
+    /** Parses the leading {@code resolution:W,H} line. Returns null if it is absent or malformed. */
+    private static double[] parseResolutionHeader(File file) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String header = reader.readLine();
+            if (header == null || !header.startsWith("resolution:")) return null;
+            String[] wh = header.substring("resolution:".length()).trim().split(",");
+            if (wh.length != 2) return null;
+            return new double[]{Double.parseDouble(wh[0].trim()), Double.parseDouble(wh[1].trim())};
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** Physical floor on the inter-sample gap (ms). 1000 Hz is about the fastest real

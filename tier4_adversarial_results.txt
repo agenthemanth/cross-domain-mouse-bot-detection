@@ -14,13 +14,13 @@ WARNING: core mtj jar files are not available as resources to this classloader (
 [SCALEFREE AUG_NAIVE     ] trainN=28419   humFPR= 0.39%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.97%  |  vs ADVERSARIAL: AUC=0.5188 TPR@<=1%=0.53% EER=47.84%
 [SCALEFREE AUG_NAIVE_PLUS] trainN=40880   humFPR=13.15%  |  vs NAIVE: AUC=0.9993 TPR@<=1%=99.46%  |  vs ADVERSARIAL: AUC=0.9583 TPR@<=1%=56.38% EER=11.28%
 
-[AUGMENTED_SEQ DELBOT_ONLY   ] trainN=3453    humFPR=27.05%  |  vs NAIVE: AUC=0.4045 TPR@<=1%=0.00%  |  vs ADVERSARIAL: AUC=0.3656 TPR@<=1%=0.76% EER=57.69%
-[AUGMENTED_SEQ AUG_NAIVE     ] trainN=28419   humFPR= 0.38%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.98%  |  vs ADVERSARIAL: AUC=0.5063 TPR@<=1%=0.45% EER=49.09%
-[AUGMENTED_SEQ AUG_NAIVE_PLUS] trainN=40880   humFPR=11.86%  |  vs NAIVE: AUC=0.9996 TPR@<=1%=99.50%  |  vs ADVERSARIAL: AUC=0.9663 TPR@<=1%=61.18% EER=9.99%
+[AUGMENTED_SEQ DELBOT_ONLY   ] trainN=3453    humFPR=26.12%  |  vs NAIVE: AUC=0.4014 TPR@<=1%=0.00%  |  vs ADVERSARIAL: AUC=0.3992 TPR@<=1%=0.55% EER=54.81%
+[AUGMENTED_SEQ AUG_NAIVE     ] trainN=28419   humFPR= 0.38%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.97%  |  vs ADVERSARIAL: AUC=0.5132 TPR@<=1%=0.40% EER=48.50%
+[AUGMENTED_SEQ AUG_NAIVE_PLUS] trainN=40880   humFPR=11.86%  |  vs NAIVE: AUC=0.9996 TPR@<=1%=99.46%  |  vs ADVERSARIAL: AUC=0.9662 TPR@<=1%=59.61% EER=9.93%
 
-[SCALEFREE_SEQ DELBOT_ONLY   ] trainN=3453    humFPR=27.85%  |  vs NAIVE: AUC=0.2593 TPR@<=1%=0.00%  |  vs ADVERSARIAL: AUC=0.3686 TPR@<=1%=0.01% EER=56.58%
-[SCALEFREE_SEQ AUG_NAIVE     ] trainN=28419   humFPR= 0.39%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.97%  |  vs ADVERSARIAL: AUC=0.5154 TPR@<=1%=0.45% EER=48.20%
-[SCALEFREE_SEQ AUG_NAIVE_PLUS] trainN=40880   humFPR=12.76%  |  vs NAIVE: AUC=0.9995 TPR@<=1%=99.44%  |  vs ADVERSARIAL: AUC=0.9601 TPR@<=1%=57.08% EER=11.00%
+[SCALEFREE_SEQ DELBOT_ONLY   ] trainN=3453    humFPR=25.45%  |  vs NAIVE: AUC=0.3843 TPR@<=1%=0.00%  |  vs ADVERSARIAL: AUC=0.3794 TPR@<=1%=0.02% EER=56.89%
+[SCALEFREE_SEQ AUG_NAIVE     ] trainN=28419   humFPR= 0.39%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.97%  |  vs ADVERSARIAL: AUC=0.4942 TPR@<=1%=0.28% EER=50.46%
+[SCALEFREE_SEQ AUG_NAIVE_PLUS] trainN=40880   humFPR=12.41%  |  vs NAIVE: AUC=0.9996 TPR@<=1%=99.45%  |  vs ADVERSARIAL: AUC=0.9614 TPR@<=1%=58.67% EER=10.73%
 
 ========================================================================
  TIER 4 -- EVASIVE BOT  (held-out Balabit users)
@@ -35,14 +35,20 @@ AUGMENTED AUG_NAIVE_PLUS   12.30% |    0.9995     99.45% |    0.9649     58.28% 
 SCALEFREE DELBOT_ONLY      32.58% |    0.2843      0.00% |    0.3638      0.04%    56.85%
 SCALEFREE AUG_NAIVE         0.39% |    0.9999     99.97% |    0.5188      0.53%    47.84%
 SCALEFREE AUG_NAIVE_PLUS   13.15% |    0.9993     99.46% |    0.9583     56.38%    11.28%
-AUGMENTED_SEQ DELBOT_ONLY      27.05% |    0.4045      0.00% |    0.3656      0.76%    57.69%
-AUGMENTED_SEQ AUG_NAIVE         0.38% |    0.9999     99.98% |    0.5063      0.45%    49.09%
-AUGMENTED_SEQ AUG_NAIVE_PLUS   11.86% |    0.9996     99.50% |    0.9663     61.18%     9.99%
-SCALEFREE_SEQ DELBOT_ONLY      27.85% |    0.2593      0.00% |    0.3686      0.01%    56.58%
-SCALEFREE_SEQ AUG_NAIVE         0.39% |    0.9999     99.97% |    0.5154      0.45%    48.20%
-SCALEFREE_SEQ AUG_NAIVE_PLUS   12.76% |    0.9995     99.44% |    0.9601     57.08%    11.00%
+AUGMENTED_SEQ DELBOT_ONLY      26.12% |    0.4014      0.00% |    0.3992      0.55%    54.81%
+AUGMENTED_SEQ AUG_NAIVE         0.38% |    0.9999     99.97% |    0.5132      0.40%    48.50%
+AUGMENTED_SEQ AUG_NAIVE_PLUS   11.86% |    0.9996     99.46% |    0.9662     59.61%     9.93%
+SCALEFREE_SEQ DELBOT_ONLY      25.45% |    0.3843      0.00% |    0.3794      0.02%    56.89%
+SCALEFREE_SEQ AUG_NAIVE         0.39% |    0.9999     99.97% |    0.4942      0.28%    50.46%
+SCALEFREE_SEQ AUG_NAIVE_PLUS   12.41% |    0.9996     99.45% |    0.9614     58.67%    10.73%
 
 AUG_NAIVE vs advAUC = does the Tier-2 winner generalise to an evasive bot it
 never trained on. AUG_NAIVE_PLUS = adversarial bots added to training too.
 Adversarial bot matches source velocity distribution + path efficiency by
 construction; residual tells are accel/jerk ORDER and slightly-too-smooth curvature.
+
+FEATURE MODES: BASELINE 7 | AUGMENTED +11 | SCALEFREE drops absolute-magnitude
+features | *_SEQ adds 2 temporal-ordering features (velocity_lag1_autocorr,
+velocity_step_roughness) that read the step-order the shuffled evasive bot
+destroys. Only the AUG_NAIVE_PLUS rows can move -- the RF must SEE the shuffled
+signature labelled bot to use it; AUG_NAIVE stays coin-flip in every mode.

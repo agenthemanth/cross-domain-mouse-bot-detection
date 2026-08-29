@@ -1,38 +1,39 @@
-Action-level cross-domain eval
+﻿Action-level cross-domain eval
   TRAIN users [user12, user16, user21, user29, user7] -> 19366 actions {MM=7500, PC=7500, DD=4366}
   TEST  users [user15, user20, user23, user35, user9] -> 17904 actions {MM=7500, PC=7500, DD=2904}
   (per-(user,type) cap 1500)
 
-[BASELINE  DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=32.83%  AUC=0.3598  EER=63.27%  TPR@<=1%=4.09%  TPR@<=5%=6.00%
-            per-action-type AUC:  MM=0.3325  PC=0.3472  DD=0.4605
-[BASELINE  DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=32.83%  AUC=0.4657  EER=55.48%  TPR@<=1%=0.05%  TPR@<=5%=7.55%
-            per-action-type AUC:  MM=0.4359  PC=0.4652  DD=0.5472
-[BASELINE  AUG_ALL     test=MATCHED_SPREAD] trainN=42185   humFPR= 1.94%  AUC=0.9324  EER=14.76%  TPR@<=1%=46.29%  TPR@<=5%=65.41%
-            per-action-type AUC:  MM=0.9330  PC=0.9532  DD=0.8665
-[BASELINE  AUG_ALL     test=BURST        ] trainN=42185   humFPR= 1.94%  AUC=0.9981  EER= 1.96%  TPR@<=1%=96.68%  TPR@<=5%=99.11%
-            per-action-type AUC:  MM=0.9981  PC=0.9988  DD=0.9973
+WARNING: core mtj jar files are not available as resources to this classloader (jdk.internal.loader.ClassLoaders$AppClassLoader@105be200)
+[BASELINE  DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=28.85%  AUC=0.4207  EER=56.64%  TPR@<=1%=4.01%  TPR@<=5%=5.21%
+            per-action-type AUC:  MM=0.3963  PC=0.4138  DD=0.5067
+[BASELINE  DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=28.85%  AUC=0.4510  EER=55.61%  TPR@<=1%=0.04%  TPR@<=5%=9.27%
+            per-action-type AUC:  MM=0.4183  PC=0.4579  DD=0.5256
+[BASELINE  AUG_ALL     test=MATCHED_SPREAD] trainN=42185   humFPR= 2.03%  AUC=0.9341  EER=14.95%  TPR@<=1%=46.84%  TPR@<=5%=67.66%
+            per-action-type AUC:  MM=0.9346  PC=0.9554  DD=0.8670
+[BASELINE  AUG_ALL     test=BURST        ] trainN=42185   humFPR= 2.03%  AUC=0.9981  EER= 2.02%  TPR@<=1%=96.77%  TPR@<=5%=99.19%
+            per-action-type AUC:  MM=0.9981  PC=0.9988  DD=0.9975
 
-[SCALEFREE DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=67.59%  AUC=0.3475  EER=64.58%  TPR@<=1%=0.00%  TPR@<=5%=0.05%
-            per-action-type AUC:  MM=0.3479  PC=0.3252  DD=0.3995
-[SCALEFREE DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=67.59%  AUC=0.3412  EER=65.08%  TPR@<=1%=0.00%  TPR@<=5%=1.69%
-            per-action-type AUC:  MM=0.3441  PC=0.3134  DD=0.4015
-[SCALEFREE AUG_ALL     test=MATCHED_SPREAD] trainN=42185   humFPR= 1.39%  AUC=0.9456  EER=10.64%  TPR@<=1%=7.85%  TPR@<=5%=61.54%
-            per-action-type AUC:  MM=0.9474  PC=0.9642  DD=0.8873
-[SCALEFREE AUG_ALL     test=BURST        ] trainN=42185   humFPR= 1.39%  AUC=0.9989  EER= 1.30%  TPR@<=1%=98.22%  TPR@<=5%=99.78%
-            per-action-type AUC:  MM=0.9991  PC=0.9993  DD=0.9974
+[SCALEFREE DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=71.09%  AUC=0.3732  EER=62.12%  TPR@<=1%=0.00%  TPR@<=5%=0.11%
+            per-action-type AUC:  MM=0.3768  PC=0.3470  DD=0.4269
+[SCALEFREE DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=71.09%  AUC=0.3564  EER=65.62%  TPR@<=1%=0.00%  TPR@<=5%=2.88%
+            per-action-type AUC:  MM=0.3620  PC=0.3231  DD=0.4249
+[SCALEFREE AUG_ALL     test=MATCHED_SPREAD] trainN=42185   humFPR= 1.37%  AUC=0.9450  EER=11.27%  TPR@<=1%=7.81%  TPR@<=5%=64.49%
+            per-action-type AUC:  MM=0.9485  PC=0.9617  DD=0.8875
+[SCALEFREE AUG_ALL     test=BURST        ] trainN=42185   humFPR= 1.37%  AUC=0.9989  EER= 1.35%  TPR@<=1%=98.05%  TPR@<=5%=99.74%
+            per-action-type AUC:  MM=0.9991  PC=0.9993  DD=0.9972
 
 ========================================================================
  TIER 3 -- ACTION-LEVEL  (held-out Balabit users)
 ========================================================================
 feat      trainset    testBotTiming   humFPR pooledAUC       EER   TPR@<=1%   TPR@<=5%
-BASELINE  DELBOT_ONLY MATCHED_SPREAD   32.83%    0.3598    63.27%      4.09%      6.00%
-BASELINE  DELBOT_ONLY BURST           32.83%    0.4657    55.48%      0.05%      7.55%
-BASELINE  AUG_ALL     MATCHED_SPREAD    1.94%    0.9324    14.76%     46.29%     65.41%
-BASELINE  AUG_ALL     BURST            1.94%    0.9981     1.96%     96.68%     99.11%
-SCALEFREE DELBOT_ONLY MATCHED_SPREAD   67.59%    0.3475    64.58%      0.00%      0.05%
-SCALEFREE DELBOT_ONLY BURST           67.59%    0.3412    65.08%      0.00%      1.69%
-SCALEFREE AUG_ALL     MATCHED_SPREAD    1.39%    0.9456    10.64%      7.85%     61.54%
-SCALEFREE AUG_ALL     BURST            1.39%    0.9989     1.30%     98.22%     99.78%
+BASELINE  DELBOT_ONLY MATCHED_SPREAD   28.85%    0.4207    56.64%      4.01%      5.21%
+BASELINE  DELBOT_ONLY BURST           28.85%    0.4510    55.61%      0.04%      9.27%
+BASELINE  AUG_ALL     MATCHED_SPREAD    2.03%    0.9341    14.95%     46.84%     67.66%
+BASELINE  AUG_ALL     BURST            2.03%    0.9981     2.02%     96.77%     99.19%
+SCALEFREE DELBOT_ONLY MATCHED_SPREAD   71.09%    0.3732    62.12%      0.00%      0.11%
+SCALEFREE DELBOT_ONLY BURST           71.09%    0.3564    65.62%      0.00%      2.88%
+SCALEFREE AUG_ALL     MATCHED_SPREAD    1.37%    0.9450    11.27%      7.81%     64.49%
+SCALEFREE AUG_ALL     BURST            1.37%    0.9989     1.35%     98.05%     99.74%
 
 Compare DELBOT_ONLY here vs the Tier-1 gap-chunk baseline (pooled bot AUC 0.53,
 human FPR 9.85%): a higher AUC = action segmentation helps zero-shot transfer.

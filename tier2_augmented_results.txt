@@ -1,43 +1,44 @@
-Balabit users: [user12, user15, user16, user20, user21, user23, user29, user35, user7, user9]
+﻿Balabit users: [user12, user15, user16, user20, user21, user23, user29, user35, user7, user9]
   TRAIN users [user12, user16, user21, user29, user7]  -> 12483 human chunks
   TEST  users [user15, user20, user23, user35, user9]  -> 11699 human chunks
 DELBOT session folders: 10
 Training-bot timing: BURST | test-bot timing: reported per model
 
-[BASELINE  DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=11.05%  AUC=0.5136  EER=48.23%  TPR@<=1%=0.01%  TPR@<=5%=0.18%
-[BASELINE  DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=11.05%  AUC=0.4561  EER=52.11%  TPR@<=1%=0.01%  TPR@<=5%=0.01%
-[BASELINE  AUG_ALL     test=MATCHED_SPREAD] trainN=28419   humFPR= 1.00%  AUC=0.9977  EER= 1.81%  TPR@<=1%=92.91%  TPR@<=5%=99.98%
-[BASELINE  AUG_ALL     test=BURST        ] trainN=28419   humFPR= 1.00%  AUC=0.9996  EER= 0.74%  TPR@<=1%=99.49%  TPR@<=5%=99.99%
-[BASELINE  AUG_HELDOUT test=MATCHED_SPREAD] trainN=28419   humFPR= 0.52%  AUC=0.9980  EER= 1.31%  TPR@<=1%=95.89%  TPR@<=5%=99.97%
-            unseen-type AUC:  MODERATE_LINEAR_VP=0.9997  ADVANCED_BEZIER_VP_JITTER=0.9948
-[BASELINE  AUG_HELDOUT test=BURST        ] trainN=28419   humFPR= 0.52%  AUC=0.9794  EER= 5.40%  TPR@<=1%=90.84%  TPR@<=5%=93.36%
-            unseen-type AUC:  MODERATE_LINEAR_VP=0.9992  ADVANCED_BEZIER_VP_JITTER=0.9185
+WARNING: core mtj jar files are not available as resources to this classloader (jdk.internal.loader.ClassLoaders$AppClassLoader@105be200)
+[BASELINE  DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=10.85%  AUC=0.4264  EER=55.76%  TPR@<=1%=0.01%  TPR@<=5%=0.02%
+[BASELINE  DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=10.85%  AUC=0.3597  EER=59.18%  TPR@<=1%=0.01%  TPR@<=5%=0.01%
+[BASELINE  AUG_ALL     test=MATCHED_SPREAD] trainN=28419   humFPR= 0.97%  AUC=0.9974  EER= 2.03%  TPR@<=1%=92.57%  TPR@<=5%=99.84%
+[BASELINE  AUG_ALL     test=BURST        ] trainN=28419   humFPR= 0.97%  AUC=0.9997  EER= 0.72%  TPR@<=1%=99.53%  TPR@<=5%=99.99%
+[BASELINE  AUG_HELDOUT test=MATCHED_SPREAD] trainN=28419   humFPR= 0.56%  AUC=0.9983  EER= 1.04%  TPR@<=1%=98.46%  TPR@<=5%=99.96%
+            unseen-type AUC:  MODERATE_LINEAR_VP=0.9998  ADVANCED_BEZIER_VP_JITTER=0.9954
+[BASELINE  AUG_HELDOUT test=BURST        ] trainN=28419   humFPR= 0.56%  AUC=0.9792  EER= 5.23%  TPR@<=1%=89.99%  TPR@<=5%=93.88%
+            unseen-type AUC:  MODERATE_LINEAR_VP=0.9992  ADVANCED_BEZIER_VP_JITTER=0.9177
 
-[SCALEFREE DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=28.21%  AUC=0.3873  EER=57.80%  TPR@<=1%=0.05%  TPR@<=5%=0.74%
-[SCALEFREE DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=28.21%  AUC=0.2845  EER=68.39%  TPR@<=1%=0.00%  TPR@<=5%=0.24%
-[SCALEFREE AUG_ALL     test=MATCHED_SPREAD] trainN=28419   humFPR= 0.38%  AUC=0.9989  EER= 0.47%  TPR@<=1%=99.88%  TPR@<=5%=99.99%
-[SCALEFREE AUG_ALL     test=BURST        ] trainN=28419   humFPR= 0.38%  AUC=0.9999  EER= 0.20%  TPR@<=1%=99.97%  TPR@<=5%=99.99%
-[SCALEFREE AUG_HELDOUT test=MATCHED_SPREAD] trainN=28419   humFPR= 0.38%  AUC=0.9984  EER= 0.83%  TPR@<=1%=99.45%  TPR@<=5%=100.00%
-            unseen-type AUC:  MODERATE_LINEAR_VP=0.9996  ADVANCED_BEZIER_VP_JITTER=0.9961
-[SCALEFREE AUG_HELDOUT test=BURST        ] trainN=28419   humFPR= 0.38%  AUC=0.9986  EER= 1.33%  TPR@<=1%=95.81%  TPR@<=5%=99.99%
-            unseen-type AUC:  MODERATE_LINEAR_VP=0.9999  ADVANCED_BEZIER_VP_JITTER=0.9948
+[SCALEFREE DELBOT_ONLY test=MATCHED_SPREAD] trainN=3453    humFPR=32.58%  AUC=0.3663  EER=59.15%  TPR@<=1%=0.01%  TPR@<=5%=0.07%
+[SCALEFREE DELBOT_ONLY test=BURST        ] trainN=3453    humFPR=32.58%  AUC=0.2847  EER=69.33%  TPR@<=1%=0.00%  TPR@<=5%=0.03%
+[SCALEFREE AUG_ALL     test=MATCHED_SPREAD] trainN=28419   humFPR= 0.39%  AUC=0.9991  EER= 0.44%  TPR@<=1%=99.92%  TPR@<=5%=99.99%
+[SCALEFREE AUG_ALL     test=BURST        ] trainN=28419   humFPR= 0.39%  AUC=0.9999  EER= 0.20%  TPR@<=1%=99.97%  TPR@<=5%=99.99%
+[SCALEFREE AUG_HELDOUT test=MATCHED_SPREAD] trainN=28419   humFPR= 0.38%  AUC=0.9982  EER= 1.16%  TPR@<=1%=97.60%  TPR@<=5%=100.00%
+            unseen-type AUC:  MODERATE_LINEAR_VP=0.9997  ADVANCED_BEZIER_VP_JITTER=0.9949
+[SCALEFREE AUG_HELDOUT test=BURST        ] trainN=28419   humFPR= 0.38%  AUC=0.9983  EER= 1.59%  TPR@<=1%=93.90%  TPR@<=5%=100.00%
+            unseen-type AUC:  MODERATE_LINEAR_VP=0.9999  ADVANCED_BEZIER_VP_JITTER=0.9935
 
 ========================================================================
  TIER 2 STEP 2 -- TRAINING AUGMENTATION  (held-out Balabit users)
 ========================================================================
 feat      trainset    testBotTiming   humFPR pooledAUC       EER    TPR@<=1%    TPR@<=5%
-BASELINE  DELBOT_ONLY MATCHED_SPREAD   11.05%    0.5136    48.23%       0.01%       0.18%
-BASELINE  DELBOT_ONLY BURST           11.05%    0.4561    52.11%       0.01%       0.01%
-BASELINE  AUG_ALL     MATCHED_SPREAD    1.00%    0.9977     1.81%      92.91%      99.98%
-BASELINE  AUG_ALL     BURST            1.00%    0.9996     0.74%      99.49%      99.99%
-BASELINE  AUG_HELDOUT MATCHED_SPREAD    0.52%    0.9980     1.31%      95.89%      99.97%
-BASELINE  AUG_HELDOUT BURST            0.52%    0.9794     5.40%      90.84%      93.36%
-SCALEFREE DELBOT_ONLY MATCHED_SPREAD   28.21%    0.3873    57.80%       0.05%       0.74%
-SCALEFREE DELBOT_ONLY BURST           28.21%    0.2845    68.39%       0.00%       0.24%
-SCALEFREE AUG_ALL     MATCHED_SPREAD    0.38%    0.9989     0.47%      99.88%      99.99%
-SCALEFREE AUG_ALL     BURST            0.38%    0.9999     0.20%      99.97%      99.99%
-SCALEFREE AUG_HELDOUT MATCHED_SPREAD    0.38%    0.9984     0.83%      99.45%     100.00%
-SCALEFREE AUG_HELDOUT BURST            0.38%    0.9986     1.33%      95.81%      99.99%
+BASELINE  DELBOT_ONLY MATCHED_SPREAD   10.85%    0.4264    55.76%       0.01%       0.02%
+BASELINE  DELBOT_ONLY BURST           10.85%    0.3597    59.18%       0.01%       0.01%
+BASELINE  AUG_ALL     MATCHED_SPREAD    0.97%    0.9974     2.03%      92.57%      99.84%
+BASELINE  AUG_ALL     BURST            0.97%    0.9997     0.72%      99.53%      99.99%
+BASELINE  AUG_HELDOUT MATCHED_SPREAD    0.56%    0.9983     1.04%      98.46%      99.96%
+BASELINE  AUG_HELDOUT BURST            0.56%    0.9792     5.23%      89.99%      93.88%
+SCALEFREE DELBOT_ONLY MATCHED_SPREAD   32.58%    0.3663    59.15%       0.01%       0.07%
+SCALEFREE DELBOT_ONLY BURST           32.58%    0.2847    69.33%       0.00%       0.03%
+SCALEFREE AUG_ALL     MATCHED_SPREAD    0.39%    0.9991     0.44%      99.92%      99.99%
+SCALEFREE AUG_ALL     BURST            0.39%    0.9999     0.20%      99.97%      99.99%
+SCALEFREE AUG_HELDOUT MATCHED_SPREAD    0.38%    0.9982     1.16%      97.60%     100.00%
+SCALEFREE AUG_HELDOUT BURST            0.38%    0.9983     1.59%      93.90%     100.00%
 
 WIN CONDITION: pooledAUC materially above the DELBOT_ONLY row for the same
 feat+timing, with humFPR held at or below the DELBOT_ONLY level. AUG_HELDOUT's

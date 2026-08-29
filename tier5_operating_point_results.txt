@@ -1,65 +1,66 @@
-TIER 5 -- operating-point tuning on the Tier-4 best model
+﻿TIER 5 -- operating-point tuning on the Tier-4 best model
 features : AUGMENTED (18)
 TRAIN users [user12, user16, user21, user29, user7] (12483 chunks)
 TEST  users [user15, user20, user23, user35, user9] (11699 chunks)
 training : 40880 instances (13340 human / 27540 bot, 2.06:1 bot-heavy)
 
+WARNING: core mtj jar files are not available as resources to this classloader (jdk.internal.loader.ClassLoaders$AppClassLoader@105be200)
 ------------------------------------------------------------------------
  VARIANT: PLAIN
 ------------------------------------------------------------------------
-  own default  : humanFPR  12.39%   naiveTPR  99.96%   advTPR  91.66%
-  ranking      : naiveAUC 0.9995   advAUC 0.9643   advEER 10.30%
+  own default  : humanFPR  12.30%   naiveTPR  99.97%   advTPR  91.60%
+  ranking      : naiveAUC 0.9995   advAUC 0.9649   advEER 10.15%
   FPR budget       achieved    naive TPR  evasive TPR
-  <= 0.5%             0.48%       99.23%       50.11%
-  <= 1.0%             0.97%       99.48%       58.29%
-  <= 2.0%             1.85%       99.63%       67.47%
-  <= 3.0%             2.97%       99.73%       73.59%
-  <= 5.0%             4.86%       99.84%       80.31%
+  <= 0.5%             0.44%       99.20%       50.21%
+  <= 1.0%             0.89%       99.45%       58.28%
+  <= 2.0%             1.97%       99.65%       69.20%
+  <= 3.0%             2.92%       99.73%       73.85%
+  <= 5.0%             4.83%       99.84%       80.44%
 
 ------------------------------------------------------------------------
  VARIANT: CLASS_BALANCED
 ------------------------------------------------------------------------
-  own default  : humanFPR   8.94%   naiveTPR  99.89%   advTPR  87.97%
-  ranking      : naiveAUC 0.9995   advAUC 0.9641   advEER 10.37%
+  own default  : humanFPR   9.06%   naiveTPR  99.90%   advTPR  87.82%
+  ranking      : naiveAUC 0.9995   advAUC 0.9638   advEER 10.38%
   FPR budget       achieved    naive TPR  evasive TPR
-  <= 0.5%             0.49%       99.30%       51.57%
-  <= 1.0%             0.92%       99.43%       57.86%
-  <= 2.0%             1.94%       99.62%       68.19%
-  <= 3.0%             2.92%       99.73%       73.49%
-  <= 5.0%             4.94%       99.80%       80.03%
+  <= 0.5%             0.40%       99.30%       49.37%
+  <= 1.0%             0.97%       99.51%       59.19%
+  <= 2.0%             1.94%       99.65%       68.23%
+  <= 3.0%             2.89%       99.73%       73.58%
+  <= 5.0%             4.74%       99.82%       80.43%
 
 ------------------------------------------------------------------------
  VARIANT: COST_REWEIGHT
 ------------------------------------------------------------------------
-  own default  : humanFPR   3.46%   naiveTPR  99.75%   advTPR  73.24%
-  ranking      : naiveAUC 0.9994   advAUC 0.9592   advEER 11.15%
+  own default  : humanFPR   3.38%   naiveTPR  99.75%   advTPR  73.07%
+  ranking      : naiveAUC 0.9994   advAUC 0.9595   advEER 11.03%
   FPR budget       achieved    naive TPR  evasive TPR
-  <= 0.5%             0.49%       99.39%       46.64%
-  <= 1.0%             0.91%       99.51%       54.36%
-  <= 2.0%             1.85%       99.67%       64.98%
-  <= 3.0%             2.91%       99.75%       71.58%
-  <= 5.0%             4.80%       99.77%       78.51%
+  <= 0.5%             0.50%       99.37%       47.85%
+  <= 1.0%             0.95%       99.52%       55.44%
+  <= 2.0%             1.98%       99.69%       65.90%
+  <= 3.0%             2.95%       99.74%       71.48%
+  <= 5.0%             4.86%       99.77%       77.99%
 
 ------------------------------------------------------------------------
  VARIANT: COST_EXPECTED
 ------------------------------------------------------------------------
-  own default  : humanFPR   0.60%   naiveTPR  99.32%   advTPR  52.32%
-  ranking      : naiveAUC 0.9995   advAUC 0.9643   advEER 10.30%
+  own default  : humanFPR   0.56%   naiveTPR  99.30%   advTPR  52.46%
+  ranking      : naiveAUC 0.9995   advAUC 0.9649   advEER 10.15%
   FPR budget       achieved    naive TPR  evasive TPR
-  <= 0.5%             0.48%       99.23%       50.11%
-  <= 1.0%             0.97%       99.48%       58.29%
-  <= 2.0%             1.85%       99.63%       67.47%
-  <= 3.0%             2.97%       99.73%       73.59%
-  <= 5.0%             4.86%       99.84%       80.31%
+  <= 0.5%             0.44%       99.20%       50.21%
+  <= 1.0%             0.89%       99.45%       58.28%
+  <= 2.0%             1.97%       99.65%       69.20%
+  <= 3.0%             2.92%       99.73%       73.85%
+  <= 5.0%             4.83%       99.84%       80.44%
 
 ========================================================================
  TIER 5 SUMMARY -- evasive-bot recall at fixed human-FPR budgets
 ========================================================================
 variant              ownFPR     advAUC |    <=0.5%    <=1.0%    <=2.0%    <=3.0%    <=5.0%
-PLAIN                12.39%     0.9643 |    50.11%    58.29%    67.47%    73.59%    80.31%
-CLASS_BALANCED        8.94%     0.9641 |    51.57%    57.86%    68.19%    73.49%    80.03%
-COST_REWEIGHT         3.46%     0.9592 |    46.64%    54.36%    64.98%    71.58%    78.51%
-COST_EXPECTED         0.60%     0.9643 |    50.11%    58.29%    67.47%    73.59%    80.31%
+PLAIN                12.30%     0.9649 |    50.21%    58.28%    69.20%    73.85%    80.44%
+CLASS_BALANCED        9.06%     0.9638 |    49.37%    59.19%    68.23%    73.58%    80.43%
+COST_REWEIGHT         3.38%     0.9595 |    47.85%    55.44%    65.90%    71.48%    77.99%
+COST_EXPECTED         0.56%     0.9649 |    50.21%    58.28%    69.20%    73.85%    80.44%
 
 (columns = evasive-bot recall when the threshold is set to hold human FPR
  at or below the stated budget. The Tier-4 headline was 12.25% FPR at the
@@ -73,16 +74,16 @@ Only CLASS_BALANCED and COST_REWEIGHT change what the trees actually learn, so
 only their AUC/recall columns can legitimately differ from PLAIN.
 
 ========================================================================
- REJECT-OPTION ANALYSIS -- variant PLAIN
+ REJECT-OPTION ANALYSIS -- variant CLASS_BALANCED
 ========================================================================
-Decision threshold 0.8700 (the <=1% human-FPR point); score range [0.000, 1.000].
+Decision threshold 0.8200 (the <=1% human-FPR point); score range [0.000, 1.000].
 band +/-         coverage  humanFPR|kept    advTPR|kept  naiveTPR|kept
-0% rng            100.00%          0.97%         58.29%         99.48%
-5% rng             96.38%          0.41%         58.34%         99.62%
-10% rng            91.23%          0.11%         53.65%         99.70%
-15% rng            19.83%          0.00%          0.00%          0.00%  <- band exceeds score ceiling; row is vacuous
-20% rng            18.86%          0.00%          0.00%          0.00%  <- band exceeds score ceiling; row is vacuous
-30% rng            17.17%          0.00%          0.00%          0.00%  <- band exceeds score ceiling; row is vacuous
+0% rng            100.00%          0.97%         59.19%         99.51%
+5% rng             97.22%          0.52%         59.89%         99.62%
+10% rng            94.57%          0.25%         60.86%         99.71%
+15% rng            89.21%          0.06%         53.98%         99.75%
+20% rng            19.26%          0.00%          0.00%          0.00%  <- band exceeds score ceiling; row is vacuous
+30% rng            17.58%          0.00%          0.00%          0.00%  <- band exceeds score ceiling; row is vacuous
 
 A reject band only helps if the deferred traffic can go somewhere useful
 (a second signal, a challenge, a human review queue). Coverage is the share

@@ -185,9 +185,7 @@ public final class Tier2Features {
         double stdTurn = turns.isEmpty() ? 0.0 : stdList(turns, meanTurn);
         double meanCurv = curvature.isEmpty() ? 0.0 : meanList(curvature);
         double pauseRatio = countBelow(v, 0.05 * meanV) / (double) nSteps;
-        double p90 = percentile(v, 0.90);
-        double p50 = percentile(v, 0.50);
-        double p90p50 = p90 / (p50 + EPS);
+        double p90p50 = velocityTailRatio(v);
 
         double[] out = {
                 velocityCv, accelToVel, jerkToVel, timeToPeakRatio, accelFraction,
@@ -195,6 +193,34 @@ public final class Tier2Features {
         };
         for (double x : out) if (Double.isNaN(x) || Double.isInfinite(x)) return null;
         return out;
+    }
+
+    /**
+     * 90th/50th percentile of speed, computed over MOVING steps only.
+     *
+     * BUG FIXED 2026-08-29: the original computed percentile(v,.90)/(percentile(v,.50)+EPS)
+     * over ALL steps. Balabit logs many consecutive events at the SAME position, so
+     * 1.51% of chunks have >50% zero-displacement steps -> the median speed is exactly 0
+     * -> the ratio became p90/1e-9, i.e. 1e8-1e9. That handful of chunks dragged the
+     * feature's mean over real humans to ~2.3 MILLION while its median was a sane 11.7,
+     * making the column effectively a "is this chunk mostly idle" indicator flag rather
+     * than the intended scale-free speed-tail measure -- and duplicating pause_ratio.
+     *
+     * Restricting to steps that actually moved makes the denominator positive by
+     * construction and keeps the semantics ("when the cursor IS moving, how heavy is the
+     * speed tail?"). The idle share is already carried by pause_ratio, so no information
+     * is lost. A fully stationary chunk has no tail: return 1.0.
+     */
+    private static double velocityTailRatio(double[] v) {
+        int moving = 0;
+        for (double s : v) if (s > 0.0) moving++;
+        if (moving == 0) return 1.0;
+        double[] m = new double[moving];
+        int w = 0;
+        for (double s : v) if (s > 0.0) m[w++] = s;
+        double p50 = percentile(m, 0.50); // > 0 by construction
+        double p90 = percentile(m, 0.90);
+        return p90 / p50;
     }
 
     // ---------------- small numeric helpers ----------------

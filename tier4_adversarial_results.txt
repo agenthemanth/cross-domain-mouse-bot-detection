@@ -5,9 +5,9 @@ TEST  users [user15, user20, user23, user35, user9] (11699 chunks)
 [BASELINE  AUG_NAIVE     ] trainN=28419   humFPR= 1.00%  |  vs NAIVE: AUC=0.9996 TPR@<=1%=99.48%  |  vs ADVERSARIAL: AUC=0.5133 TPR@<=1%=0.74% EER=48.60%
 [BASELINE  AUG_NAIVE_PLUS] trainN=40880   humFPR=30.71%  |  vs NAIVE: AUC=0.9968 TPR@<=1%=96.88%  |  vs ADVERSARIAL: AUC=0.8018 TPR@<=1%=8.77% EER=27.26%
 
-[AUGMENTED DELBOT_ONLY   ] trainN=3453    humFPR=24.51%  |  vs NAIVE: AUC=0.4192 TPR@<=1%=0.00%  |  vs ADVERSARIAL: AUC=0.3857 TPR@<=1%=0.23% EER=56.30%
-[AUGMENTED AUG_NAIVE     ] trainN=28419   humFPR= 0.33%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.97%  |  vs ADVERSARIAL: AUC=0.5416 TPR@<=1%=0.82% EER=45.62%
-[AUGMENTED AUG_NAIVE_PLUS] trainN=40880   humFPR=12.25%  |  vs NAIVE: AUC=0.9994 TPR@<=1%=99.53%  |  vs ADVERSARIAL: AUC=0.9661 TPR@<=1%=60.11% EER=10.19%
+[AUGMENTED DELBOT_ONLY   ] trainN=3453    humFPR=25.72%  |  vs NAIVE: AUC=0.4069 TPR@<=1%=0.01%  |  vs ADVERSARIAL: AUC=0.3685 TPR@<=1%=0.54% EER=57.64%
+[AUGMENTED AUG_NAIVE     ] trainN=28419   humFPR= 0.33%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.98%  |  vs ADVERSARIAL: AUC=0.5222 TPR@<=1%=0.53% EER=47.63%
+[AUGMENTED AUG_NAIVE_PLUS] trainN=40880   humFPR=12.39%  |  vs NAIVE: AUC=0.9995 TPR@<=1%=99.48%  |  vs ADVERSARIAL: AUC=0.9643 TPR@<=1%=58.29% EER=10.30%
 
 ========================================================================
  TIER 4 -- EVASIVE BOT  (held-out Balabit users)
@@ -16,9 +16,9 @@ feat      trainset         humFPR |  naiveAUC naiveTPR@1% |    advAUC  advTPR@1%
 BASELINE  DELBOT_ONLY      11.05% |    0.4559      0.01% |    0.4700      1.81%    50.88%
 BASELINE  AUG_NAIVE         1.00% |    0.9996     99.48% |    0.5133      0.74%    48.60%
 BASELINE  AUG_NAIVE_PLUS   30.71% |    0.9968     96.88% |    0.8018      8.77%    27.26%
-AUGMENTED DELBOT_ONLY      24.51% |    0.4192      0.00% |    0.3857      0.23%    56.30%
-AUGMENTED AUG_NAIVE         0.33% |    0.9999     99.97% |    0.5416      0.82%    45.62%
-AUGMENTED AUG_NAIVE_PLUS   12.25% |    0.9994     99.53% |    0.9661     60.11%    10.19%
+AUGMENTED DELBOT_ONLY      25.72% |    0.4069      0.01% |    0.3685      0.54%    57.64%
+AUGMENTED AUG_NAIVE         0.33% |    0.9999     99.98% |    0.5222      0.53%    47.63%
+AUGMENTED AUG_NAIVE_PLUS   12.39% |    0.9995     99.48% |    0.9643     58.29%    10.30%
 
 AUG_NAIVE vs advAUC = does the Tier-2 winner generalise to an evasive bot it
 never trained on. AUG_NAIVE_PLUS = adversarial bots added to training too.

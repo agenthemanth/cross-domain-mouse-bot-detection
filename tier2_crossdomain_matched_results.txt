@@ -17,40 +17,40 @@ DELBOT session folders: 10 | Balabit raw session files: 1676
 # MODE: AUGMENTED   features: num_points, duration_ms, mean_velocity, std_velocity, mean_acceleration, mean_jerk, path_efficiency, velocity_cv, accel_to_vel_ratio, jerk_to_vel_ratio, time_to_peak_vel_ratio, accel_fraction, dir_reversal_rate, mean_turning_angle, std_turning_angle, mean_curvature, pause_ratio, vel_p90_p50_ratio
 ########################################################################
   DELBOT training: 3453 instances (857 human / 2596 bot), 18 features
-  human FPR @0.5 : 22.83%  (5520 / 24182)
+  human FPR @0.5 : 23.89%  (5777 / 24182)
   bot type                         TPR@.5      AUC      EER   TPR@<=1%   TPR@<=5%
-  MODERATE_LINEAR                   0.00%   0.1862   73.40%      0.00%      0.00%
-  MODERATE_LINEAR_VP                0.00%   0.0788   83.40%      0.00%      0.00%
-  ADVANCED_BEZIER                   0.18%   0.1933   72.62%      0.05%      0.14%
-  ADVANCED_BEZIER_VP_JITTER        91.99%   0.8474   19.56%      0.14%      4.36%
-  POOLED                           23.05%   0.3264   65.02%      0.05%      1.13%
+  MODERATE_LINEAR                   0.00%   0.2224   70.64%      0.00%      0.00%
+  MODERATE_LINEAR_VP                0.00%   0.0578   86.67%      0.00%      0.00%
+  ADVANCED_BEZIER                   0.17%   0.2541   65.89%      0.00%      0.08%
+  ADVANCED_BEZIER_VP_JITTER        93.02%   0.8783   18.63%      0.84%     22.36%
+  POOLED                           23.30%   0.3531   62.51%      0.21%      5.61%
 
 ########################################################################
 # MODE: SCALEFREE   features: num_points, duration_ms, path_efficiency, velocity_cv, accel_to_vel_ratio, jerk_to_vel_ratio, time_to_peak_vel_ratio, accel_fraction, dir_reversal_rate, mean_turning_angle, std_turning_angle, mean_curvature, pause_ratio, vel_p90_p50_ratio
 ########################################################################
   DELBOT training: 3453 instances (857 human / 2596 bot), 14 features
-  human FPR @0.5 : 26.02%  (6293 / 24182)
+  human FPR @0.5 : 25.93%  (6271 / 24182)
   bot type                         TPR@.5      AUC      EER   TPR@<=1%   TPR@<=5%
-  MODERATE_LINEAR                   0.05%   0.2384   70.03%      0.00%      0.00%
-  MODERATE_LINEAR_VP                0.36%   0.0965   84.42%      0.00%      0.00%
-  ADVANCED_BEZIER                   0.16%   0.3057   64.07%      0.00%      0.00%
-  ADVANCED_BEZIER_VP_JITTER        90.17%   0.7834   23.70%      0.02%      1.29%
-  POOLED                           22.69%   0.3560   61.39%      0.01%      0.33%
+  MODERATE_LINEAR                   0.57%   0.3011   62.20%      0.00%      0.00%
+  MODERATE_LINEAR_VP                0.79%   0.0600   88.82%      0.00%      0.00%
+  ADVANCED_BEZIER                   8.15%   0.3533   59.16%      0.00%      0.00%
+  ADVANCED_BEZIER_VP_JITTER        93.95%   0.8399   19.22%      0.55%      5.91%
+  POOLED                           25.86%   0.3886   57.35%      0.14%      1.48%
 
 ========================================================================
  TIER 2 BEFORE / AFTER  (cross-domain: DELBOT-trained -> Balabit)
 ========================================================================
 mode         #feat   humanFPR  pooledAUC pooledEER TPR@<=1%FPR TPR@<=5%FPR
 BASELINE         7      9.85%     0.5326    47.26%       0.00%       0.21%
-AUGMENTED       18     22.83%     0.3264    65.02%       0.05%       1.13%
-SCALEFREE       14     26.02%     0.3560    61.39%       0.01%       0.33%
+AUGMENTED       18     23.89%     0.3531    62.51%       0.21%       5.61%
+SCALEFREE       14     25.93%     0.3886    57.35%       0.14%       1.48%
 
 Per-bot-type pooled ROC-AUC:
 bot type                         BASELINE  AUGMENTED  SCALEFREE
-MODERATE_LINEAR                    0.5591     0.1862     0.2384
-MODERATE_LINEAR_VP                 0.4825     0.0788     0.0965
-ADVANCED_BEZIER                    0.5690     0.1933     0.3057
-ADVANCED_BEZIER_VP_JITTER          0.5196     0.8474     0.7834
+MODERATE_LINEAR                    0.5591     0.2224     0.3011
+MODERATE_LINEAR_VP                 0.4825     0.0578     0.0600
+ADVANCED_BEZIER                    0.5690     0.2541     0.3533
+ADVANCED_BEZIER_VP_JITTER          0.5196     0.8783     0.8399
 
 Interpretation guide: AUC ~0.50 = no cross-domain discrimination (Tier-1 result
 was 0.53). A material rise in SCALEFREE/AUGMENTED AUC with humanFPR held near or

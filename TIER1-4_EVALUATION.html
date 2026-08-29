@@ -1,0 +1,680 @@
+<title>Eleven-Feature Upgrade Review</title>
+<meta name="description" content="Peer + architecture review of the cross-domain mouse-dynamics bot detector, graded against its own Tier 1–4 measurements, BeCAPTCHA-Mouse, and commercial CAPTCHA.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+  :root {
+    --bg:#F4F6F8; --surface:#FFFFFF; --surface-2:#EDF0F3;
+    --ink:#171B21; --ink-soft:#484F5A; --ink-faint:#79818D;
+    --border:#DCE0E6; --border-strong:#C4CAD3;
+    --accent:#2A5FD0; --accent-soft:#E6EDFB;
+    --good:#2F7A4A; --good-soft:#E1EFE7;
+    --warn:#8C6210; --warn-soft:#F5EBD6;
+    --crit:#AC3A31; --crit-soft:#F6E2E0;
+    --mono-bg:#EFF2F5;
+    --shadow:0 1px 2px rgba(20,28,40,.04), 0 8px 24px -12px rgba(20,28,40,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0C0F13; --surface:#141920; --surface-2:#1B212A;
+      --ink:#E6E9EC; --ink-soft:#A7AEB8; --ink-faint:#727A85;
+      --border:#242B34; --border-strong:#39424D;
+      --accent:#6E9BFF; --accent-soft:#182643;
+      --good:#67BE86; --good-soft:#15271C;
+      --warn:#DEAC5C; --warn-soft:#2A2213;
+      --crit:#E87A6E; --crit-soft:#2C1613;
+      --mono-bg:#191F27;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#0C0F13; --surface:#141920; --surface-2:#1B212A;
+    --ink:#E6E9EC; --ink-soft:#A7AEB8; --ink-faint:#727A85;
+    --border:#242B34; --border-strong:#39424D;
+    --accent:#6E9BFF; --accent-soft:#182643;
+    --good:#67BE86; --good-soft:#15271C;
+    --warn:#DEAC5C; --warn-soft:#2A2213;
+    --crit:#E87A6E; --crit-soft:#2C1613;
+    --mono-bg:#191F27;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.55);
+  }
+
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body {
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"IBM Plex Serif", Georgia, "Times New Roman", serif;
+    font-size:17px;
+    line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:900px; margin:0 auto; padding:clamp(28px,5vw,72px) clamp(18px,4vw,40px) 120px; }
+  .col { max-width:660px; }
+
+  h1,h2,h3,h4,.label,.eyebrow,th,.pill,.verdict-tag { font-family:"IBM Plex Sans", system-ui, sans-serif; }
+  h1 { font-size:clamp(1.9rem,4.4vw,2.7rem); line-height:1.1; font-weight:700; letter-spacing:-.02em; text-wrap:balance; margin:.2em 0 .35em; }
+  h2 { font-size:clamp(1.3rem,2.6vw,1.6rem); font-weight:600; letter-spacing:-.01em; text-wrap:balance; margin:0 0 .1em; }
+  h3 { font-size:1.06rem; font-weight:600; margin:2em 0 .5em; }
+  h4 { font-size:.83rem; font-weight:600; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-faint); margin:1.8em 0 .6em; }
+  p { margin:0 0 1.05em; }
+  .col p, .col li { max-width:66ch; }
+  a { color:var(--accent); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+  a:hover { border-bottom-color:var(--accent); }
+  strong { font-weight:600; }
+  em { color:var(--ink-soft); }
+  code, .mono { font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:.86em; background:var(--mono-bg); padding:.08em .38em; border-radius:4px; }
+  .num { font-family:"IBM Plex Mono", monospace; font-variant-numeric:tabular-nums; font-weight:500; }
+
+  .eyebrow { font-size:.78rem; text-transform:uppercase; letter-spacing:.14em; color:var(--accent); font-weight:600; }
+  .masthead { border-bottom:2px solid var(--ink); padding-bottom:1.6em; margin-bottom:2.2em; }
+  .masthead .meta { display:flex; flex-wrap:wrap; gap:.5em 1.4em; font-family:"IBM Plex Mono", monospace; font-size:.78rem; color:var(--ink-faint); margin-top:1em; }
+
+  .bottomline {
+    background:var(--surface); border:1px solid var(--border-strong); border-left:4px solid var(--accent);
+    border-radius:8px; padding:1.15em 1.3em; margin:1.8em 0 0; box-shadow:var(--shadow);
+  }
+  .bottomline .label { display:block; font-size:.74rem; text-transform:uppercase; letter-spacing:.12em; color:var(--ink-faint); margin-bottom:.4em; }
+  .bottomline p { margin:0; font-size:1.02rem; }
+
+  section { margin-top:3.4em; }
+  .sec-head { display:flex; gap:.7em; align-items:baseline; border-bottom:1px solid var(--border); padding-bottom:.55em; margin-bottom:1.3em; }
+  .sec-head .n { font-family:"IBM Plex Mono", monospace; font-size:.9rem; color:var(--ink-faint); font-weight:500; padding-top:.15em; }
+
+  /* claim vs measurement */
+  .cvm { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin:1.4em 0; }
+  .cvm > div { background:var(--surface); padding:1em 1.15em; }
+  .cvm .k { font-size:.72rem; text-transform:uppercase; letter-spacing:.1em; font-weight:600; font-family:"IBM Plex Sans",sans-serif; margin-bottom:.5em; }
+  .cvm .brief .k { color:var(--ink-faint); }
+  .cvm .real .k { color:var(--accent); }
+  .cvm p { margin:0; font-size:.92rem; line-height:1.5; }
+  .cvm .brief p { color:var(--ink-soft); }
+  @media (max-width:620px){ .cvm { grid-template-columns:1fr; } }
+
+  .callout { border:1px solid var(--border-strong); border-radius:8px; padding:1em 1.2em; margin:1.4em 0; background:var(--surface); }
+  .callout.good { border-left:4px solid var(--good); background:var(--good-soft); }
+  .callout.warn { border-left:4px solid var(--warn); background:var(--warn-soft); }
+  .callout.crit { border-left:4px solid var(--crit); background:var(--crit-soft); }
+  .callout .verdict-tag { font-size:.72rem; text-transform:uppercase; letter-spacing:.11em; font-weight:600; display:block; margin-bottom:.4em; }
+  .callout.good .verdict-tag { color:var(--good); }
+  .callout.warn .verdict-tag { color:var(--warn); }
+  .callout.crit .verdict-tag { color:var(--crit); }
+  .callout p:last-child { margin-bottom:0; }
+  .callout p { font-size:.95rem; }
+
+  .scroll { overflow-x:auto; margin:1.5em 0; border:1px solid var(--border); border-radius:8px; -webkit-overflow-scrolling:touch; }
+  table { border-collapse:collapse; width:100%; font-size:.87rem; }
+  caption { text-align:left; font-family:"IBM Plex Sans",sans-serif; font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-faint); padding:.9em 1em .2em; caption-side:top; }
+  th, td { padding:.6em .9em; text-align:left; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { font-size:.74rem; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); font-weight:600; background:var(--surface-2); position:sticky; top:0; }
+  tbody tr:last-child td { border-bottom:none; }
+  td.n, th.n { font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+  .rowlead { font-family:"IBM Plex Sans",sans-serif; font-weight:500; font-size:.85rem; }
+  .chip { display:inline-block; font-family:"IBM Plex Sans",sans-serif; font-size:.68rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; padding:.18em .5em; border-radius:4px; white-space:nowrap; }
+  .chip.g { background:var(--good-soft); color:var(--good); }
+  .chip.w { background:var(--warn-soft); color:var(--warn); }
+  .chip.c { background:var(--crit-soft); color:var(--crit); }
+  .chip.n { background:var(--surface-2); color:var(--ink-faint); }
+
+  ul.tight { margin:.4em 0 1.1em; padding-left:1.3em; }
+  ul.tight li { margin:.35em 0; }
+  ol.rec { list-style:none; counter-reset:r; padding:0; margin:1.2em 0; }
+  ol.rec li { counter-increment:r; position:relative; padding:1em 0 1em 3em; border-top:1px solid var(--border); }
+  ol.rec li:first-child { border-top:none; }
+  ol.rec li::before { content:counter(r); position:absolute; left:0; top:.95em; font-family:"IBM Plex Mono",monospace; font-size:.95rem; font-weight:600; color:var(--accent); background:var(--accent-soft); width:1.7em; height:1.7em; display:grid; place-items:center; border-radius:6px; }
+  ol.rec .rl { font-family:"IBM Plex Sans",sans-serif; font-weight:600; font-size:.98rem; display:block; margin-bottom:.15em; }
+  ol.rec p { font-size:.92rem; margin:.2em 0 0; color:var(--ink-soft); }
+
+  .foot { margin-top:4em; padding-top:1.4em; border-top:2px solid var(--ink); font-family:"IBM Plex Mono",monospace; font-size:.76rem; color:var(--ink-faint); line-height:1.7; }
+  .foot p { max-width:none; }
+
+  @media (prefers-reduced-motion:no-preference){ a,.callout{ transition:border-color .15s ease; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="eyebrow">Peer &amp; architecture review</span>
+    <h1>Eleven-Feature Upgrade Review</h1>
+    <p class="col" style="font-size:1.06rem; color:var(--ink-soft); margin-top:.3em;">
+      Grading the proposed cross-domain mouse-dynamics bot detector against its own
+      Tier&nbsp;1–4 measurements, the BeCAPTCHA-Mouse paper (Acien et al., 2022), and
+      what commercial CAPTCHA actually does.
+    </p>
+    <div class="meta">
+      <span>DELBOT&nbsp;→&nbsp;Balabit</span>
+      <span>Weka 3.8.6 · RandomForest ×100</span>
+      <span>reviewer: adversarial</span>
+      <span>2026-08-29</span>
+    </div>
+  </header>
+
+  <div class="bottomline">
+    <span class="label">Bottom line</span>
+    <p>
+      The four new features are cheap and fast, but <strong>they were already tested this
+      cycle and they do not solve the zero-shot gap</strong> — added to a DELBOT-only model
+      they push cross-domain bot AUC from <span class="num">0.53</span> down to
+      <span class="num">0.35–0.39</span> and roughly double the human false-positive rate.
+      The lever that works is <strong>training-set augmentation</strong>; a feature-matched
+      evasive bot then defeats <em>that</em>; and adversarial training recovers it.
+      A follow-up experiment (§3) shows the remaining <span class="num">12.4%</span>
+      false-positive rate was a <strong>reporting artefact of the default threshold</strong> —
+      tuned, the same model catches <span class="num">58%</span> of evasive bots at
+      <span class="num">0.97%</span> human FPR. That makes this a credible layered
+      <em>signal</em> and a genuine research contribution about limits. It is still not a
+      standalone CAPTCHA replacement, and it cannot be benchmarked against reCAPTCHA-class
+      systems, which publish no operating points and share no test set.
+    </p>
+  </div>
+
+  <!-- ─────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head"><span class="n">00</span><h2>Three premises to correct before scoring</h2></div>
+    <div class="col">
+      <p>
+        The brief is built on numbers that this project has already superseded. None of
+        the analysis that follows works unless these are fixed first.
+      </p>
+    </div>
+
+    <div class="cvm">
+      <div class="brief">
+        <div class="k">The brief says</div>
+        <p>Baseline: 7-feature RF gives <span class="num">1.07%</span> FPR on Balabit humans,
+           bot TPR collapses to <span class="num">1.33%</span>, ROC-AUC&nbsp;<span class="num">~0.68</span>.</p>
+      </div>
+      <div class="real">
+        <div class="k">What was measured</div>
+        <p>Those are the <strong>pre-bug-fix artefact numbers</strong>. Inter-sample <code>dt</code>
+           was clamped to 1&nbsp;µs; Balabit logs ~16.5% of samples at tied timestamps, which
+           inflated every velocity/accel/jerk feature up to ~10⁶×. After the fix
+           (<code>collapseToDistinctTimestamps</code> + 1&nbsp;ms floor) the real baseline is
+           <strong>FPR <span class="num">9.85%</span></strong> (2381&nbsp;/&nbsp;24182 chunks),
+           <strong>pooled bot AUC <span class="num">0.5326</span></strong>, TPR@0.5
+           <span class="num">0.39%</span>, TPR@≤1%&nbsp;FPR <span class="num">0.00%</span>.
+           The <span class="num">1.07%</span> reproduces exactly when the fix is reverted; the
+           <span class="num">0.68</span> AUC was never reproduced — the closest partial
+           bug-repro lands at <span class="num">0.62</span>.</p>
+      </div>
+    </div>
+
+    <div class="cvm">
+      <div class="brief">
+        <div class="k">The brief says</div>
+        <p>"The <em>proposed</em> solution: 4 domain-bridging kinematic features" — pause ratio,
+           direction-change frequency, mean angular velocity, accel/decel time ratio.</p>
+      </div>
+      <div class="real">
+        <div class="k">What was measured</div>
+        <p>All four are already implemented in <code>Tier2Features.java</code> and measured:
+           pause ratio → <code>pause_ratio</code>; direction-change frequency →
+           <code>dir_reversal_rate</code>; angular velocity → <code>mean_turning_angle</code> /
+           <code>std_turning_angle</code>; accel/decel ratio → <code>time_to_peak_vel_ratio</code> +
+           <code>accel_fraction</code>. This is not a hypothesis to evaluate — it is a completed
+           experiment (Tier&nbsp;2), and the result is negative (§1.2).</p>
+      </div>
+    </div>
+
+    <div class="cvm">
+      <div class="brief">
+        <div class="k">The brief says</div>
+        <p>Sub-millisecond latency (&lt;0.5&nbsp;ms per session chunk); zero GPU; in-memory.</p>
+      </div>
+      <div class="real">
+        <div class="k">What was measured</div>
+        <p><strong>This one holds.</strong> Warm-JVM benchmark, 7-feature model, 20,000 Balabit
+           chunks (~66 points each): feature extraction <span class="num">10.7&nbsp;µs</span> +
+           RF inference <span class="num">13.8&nbsp;µs</span> = <strong><span class="num">24.5&nbsp;µs</span>
+           per chunk</strong> (~<span class="num">0.024&nbsp;ms</span>). One-time model build
+           <span class="num">552&nbsp;ms</span>. Caveat: this excludes HTTP/JSON deserialization
+           of the raw event stream, which in practice dominates.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────── OBJECTIVE 1 -->
+  <section>
+    <div class="sec-head"><span class="n">01</span><h2>Academic: novelty and defensibility vs. BeCAPTCHA-Mouse</h2></div>
+
+    <h3>1.1 &nbsp;Feature-engineering efficiency</h3>
+    <div class="col">
+      <p>
+        The efficiency argument is real and worth making. BeCAPTCHA-Mouse's neuromotor pipeline
+        fits a Sigma-Lognormal decomposition per trajectory — iterative curve-fitting, and the
+        feature count varies with the number of lognormal strokes recovered. The 11-feature
+        schema here is closed-form timestamp and coordinate arithmetic: one linear pass,
+        <span class="num">~11&nbsp;µs</span> measured. For a real-time backend that is a
+        genuine, quantifiable advantage.
+      </p>
+      <p>
+        But efficiency only counts if accuracy is competitive, and here the comparison breaks
+        down on <em>task</em>, not speed. BeCAPTCHA reports <strong>within-domain</strong>
+        bot detection — train and test on the same population, against their own synthetic
+        bots. Their headline is accuracy ~93% on one trajectory, ~99% combined, RF 98.7%
+        (Table&nbsp;5), and their augmentation result is the one this project leans on:
+        train-on-real-only <span class="num">66.3%</span> → train-on-real+synthetic
+        <span class="num">96.6%</span> (Table&nbsp;4). None of that is a cross-dataset number.
+      </p>
+    </div>
+    <div class="callout warn">
+      <span class="verdict-tag">Partial</span>
+      <p>The throughput claim is defensible and easy to quantify. "Matches their performance
+        with cheaper features" is <strong>not</strong> supported — the 11-feature model does not
+        reach BeCAPTCHA-class accuracy in the setting this project actually tests (cross-domain),
+        and BeCAPTCHA's own within-domain numbers were produced with a much richer representation.</p>
+    </div>
+
+    <h3>1.2 &nbsp;Zero-shot cross-dataset generalization — the headline result</h3>
+    <div class="col">
+      <p>
+        This is the question the brief wants answered "yes," and the measured answer is
+        <strong>no</strong>. Tier&nbsp;2 trained the RandomForest on DELBOT only and evaluated
+        it on Balabit humans + matched synthetic bot twins, across three feature sets:
+      </p>
+    </div>
+
+    <div class="scroll">
+      <table>
+        <caption>Tier 2 · DELBOT-only training · cross-domain evaluation on held-out Balabit</caption>
+        <thead>
+          <tr><th>Feature set</th><th class="n">#feat</th><th class="n">Human FPR @0.5</th><th class="n">Pooled bot AUC</th><th class="n">TPR @≤1% FPR</th><th>Verdict</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="rowlead">BASELINE (Tier-1 seven)</td><td class="n">7</td><td class="n">9.85%</td><td class="n">0.533</td><td class="n">0.00%</td><td><span class="chip n">reference</span></td></tr>
+          <tr><td class="rowlead">AUGMENTED (7 + 11 new)</td><td class="n">18</td><td class="n">23.89%</td><td class="n">0.353</td><td class="n">0.21%</td><td><span class="chip c">worse</span></td></tr>
+          <tr><td class="rowlead">SCALEFREE (dimensionless only)</td><td class="n">14</td><td class="n">25.93%</td><td class="n">0.389</td><td class="n">0.14%</td><td><span class="chip c">worse</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <p>
+        Adding the domain-bridging features to a DELBOT-only model made cross-domain transfer
+        <em>worse on every axis</em>: pooled AUC dropped below <span class="num">0.5</span>
+        (bots now score as <em>more human</em> than the humans), and the human false-positive
+        rate rose from <span class="num">9.85%</span> to <span class="num">24–26%</span>. The
+        mechanism is clean: in the enriched space the DELBOT boundary reads "smooth minimum-jerk
+        motion = human, natural hand tremor = bot," and Balabit's real administrative work is
+        full of tremor and direction changes. Scale-normalising the features (SCALEFREE) does
+        not rescue it.
+      </p>
+      <p>
+        <strong>What does work is orthogonal to features.</strong> Tier&nbsp;2's augmentation
+        arm — add one synthetic bot twin per <em>held-out-user</em> training chunk to the
+        DELBOT set — takes pooled bot AUC from <span class="num">0.53</span> to
+        <span class="num">0.998</span>, human FPR from ~<span class="num">10%</span> to
+        ~<span class="num">1%</span>, and it generalises to held-out users <em>and</em>
+        held-out bot types (unseen "*_VP*" variants: AUC <span class="num">0.92–0.9998</span>).
+        That is the finding to build the paper around — not the feature list.
+      </p>
+    </div>
+    <div class="callout crit">
+      <span class="verdict-tag">Not supported</span>
+      <p>The 11-feature schema does <strong>not</strong> close the DELBOT→Balabit zero-shot gap.
+        On the measurements it widens it. Claiming otherwise in a journal submission would be
+        contradicted by the project's own logs.</p>
+    </div>
+
+    <h3>1.3 &nbsp;Theoretical defensibility and hidden flaws</h3>
+    <div class="col">
+      <p>The expansion is defensible <em>as engineering</em> — the features are well-motivated
+        and cheap — but three concrete problems surface under zero-shot transfer:</p>
+      <ul class="tight">
+        <li><strong><code>vel_p90_p50_ratio</code> was artefact-dominated — now fixed, and
+          the fix changed nothing.</strong> Its mean over real Balabit humans was
+          <span class="num">~2.3&nbsp;million</span>. The cause was <em>not</em> velocity
+          spikes (the initial diagnosis): <span class="num">1.51%</span> of chunks log more
+          than half their steps at the <em>same coordinate</em>, so their median speed is
+          exactly&nbsp;0 and <code>p90/(0+1e-9)</code> explodes to ~10⁹. The column had
+          degenerated into a duplicate of <code>pause_ratio</code>. Recomputing the ratio over
+          <em>moving</em> steps only gives a sane mean of <span class="num">13.3</span> for
+          humans vs <span class="num">20.3</span> for the evasive bot — genuinely
+          discriminative. Re-running every tier after the fix moved results by
+          <span class="num">&lt;0.02</span> AUC and changed no conclusion: the forest was
+          already ignoring the column. A useful robustness check to report.</li>
+        <li><strong>"Task-invariant" is an assumption, not a property.</strong> Pause ratio,
+          direction-change frequency and turning statistics are only invariant if the two
+          domains sample motion at comparable rates and the "pause" threshold means the same
+          thing in a 3-second circle task and a 40-minute work session. Tier&nbsp;3 shows they
+          are not: re-segmenting Balabit to the action level (median 1.6&nbsp;s / 11 points,
+          much closer to DELBOT's scale) made zero-shot transfer <em>worse still</em> — human
+          FPR <span class="num">33–68%</span> — because short Balabit actions sit even further
+          outside DELBOT's 100–200-point distribution.</li>
+        <li><strong>Accel/decel time ratio needs a defined peak.</strong> With a noisy velocity
+          series and no smoothing, <code>argmax(v)</code> is unstable; on a multi-sub-movement
+          Balabit chunk it is close to meaningless. BeCAPTCHA gets the antagonist/agonist
+          signal <em>because</em> it fits a smooth model first — replacing curve-fitting with
+          <code>argmax</code> on raw samples discards exactly the property being cited.</li>
+      </ul>
+      <p>The honest framing for a paper: <em>these features were tried; here is why hand-crafted
+        kinematics do not transfer; here is what does (augmentation) and how far
+        (§2.2).</em></p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────── OBJECTIVE 2 -->
+  <section>
+    <div class="sec-head"><span class="n">02</span><h2>Commercial: viability vs. reCAPTCHA / Turnstile / hCaptcha</h2></div>
+
+    <h3>2.1 &nbsp;Market differentiation</h3>
+    <div class="col">
+      <p>The positioning has one strong pillar and two that need qualifying.</p>
+    </div>
+    <div class="scroll">
+      <table>
+        <caption>Positioning claims, graded</caption>
+        <thead><tr><th>Claim</th><th>Assessment</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="rowlead">&lt;0.5&nbsp;ms, zero GPU, in-memory</td>
+            <td><span class="chip g">holds</span> &nbsp;Measured at <span class="num">24.5&nbsp;µs</span>
+              core compute. A real operational advantage over deep-model detectors. Publish the
+              benchmark with the request-parsing overhead included so it is not overstated.</td>
+          </tr>
+          <tr>
+            <td class="rowlead">"100% privacy-preserving, GDPR-exempt by design, no consent required"</td>
+            <td><span class="chip c">overclaim</span> &nbsp;Mouse-dynamics vectors are
+              <strong>personal data</strong> under GDPR — the entire Balabit/Antal line of work
+              exists <em>because</em> these signals single out and re-identify individuals, and
+              a biometric used for that purpose can fall under Art.&nbsp;9 special category.
+              Not storing cookies or a persistent ID reduces obligations; it does not create an
+              exemption. "Consent-free" needs a named lawful basis (legitimate interest) and a
+              DPIA, not a design claim.</td>
+          </tr>
+          <tr>
+            <td class="rowlead">"Botnet / proxy immunity — evaluates physical movement, not IP/headers"</td>
+            <td><span class="chip w">double-edged</span> &nbsp;True that it is not fooled by IP
+              rotation. But IP/ASN reputation, TLS and header entropy, and account history are
+              the signals that stop the <em>majority</em> of real bot traffic cheaply. A
+              detector that ignores them is not immune to botnets — it is <em>blind to the
+              layer where botnets are cheapest to catch</em>, and it cannot use cross-session
+              correlation (10k residential IPs all emitting the same trajectory distribution)
+              because it scores each session in isolation.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col">
+      <p>
+        The defensible market story is <strong>"a fast, self-hosted, network-independent
+        behavioural signal to add to a risk engine"</strong> — not a replacement for one.
+      </p>
+    </div>
+
+    <h3>2.2 &nbsp;Production vulnerabilities — the evasion result</h3>
+    <div class="col">
+      <p>Tier&nbsp;4 answers this question with data rather than speculation. It builds a
+        <em>feature-matched adversarial twin</em>: a bot whose velocity distribution and path
+        efficiency match its source human by construction (verified: mean velocity
+        <span class="num">8.81</span> vs <span class="num">8.88</span>; path efficiency
+        <span class="num">0.182</span> vs <span class="num">0.182</span>). Then it re-runs the
+        augmented model against it.</p>
+    </div>
+
+    <div class="scroll">
+      <table>
+        <caption>Tier 4 · held-out users · augmented model vs. naive bots and the evasive twin</caption>
+        <thead>
+          <tr><th>Feature set</th><th>Training</th><th class="n">Human FPR</th><th class="n">AUC vs naive</th><th class="n">AUC vs evasive</th><th class="n">Evasive TPR @≤1% FPR</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="rowlead">BASELINE 7</td><td>+ naive twins</td><td class="n">1.00%</td><td class="n">0.9996</td><td class="n">0.513</td><td class="n">0.7%</td></tr>
+          <tr><td class="rowlead">AUGMENTED 18</td><td>+ naive twins</td><td class="n">0.33%</td><td class="n">0.9999</td><td class="n">0.522</td><td class="n">0.5%</td></tr>
+          <tr><td class="rowlead">AUGMENTED 18</td><td>+ naive <em>and</em> evasive twins</td><td class="n">12.39%</td><td class="n">0.9995</td><td class="n">0.964</td><td class="n">58.3%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <p>
+        Read the middle row: the model that scores <span class="num">0.9999</span> against
+        naive bots is <strong>a coin flip</strong> (<span class="num">0.52</span>) against a
+        bot that simply reuses the target's own speed and curvature statistics. It learned the
+        naive bots' crude tells and the evasive bot does not have them.
+      </p>
+      <p>
+        Adding evasive twins to training recovers it — <span class="num">0.964</span> AUC —
+        but only with the full 18-feature set. The <span class="num">12.39%</span> human FPR
+        in that row looks disqualifying, and it is the number the original brief would have to
+        answer for; §3 shows it is an artefact of <em>where the default threshold sits</em>,
+        not of the model. At 7 features the same move flags <span class="num">31%</span> of
+        humans, so the rich feature set is doing real work here.
+      </p>
+      <p>
+        The standing caveat is unchanged: the adversarial twin matches only ~10 of 18
+        features. One that also matched acceleration ordering and curvature would likely pull
+        <span class="num">0.964</span> back toward chance, and a reinforcement-learning bot
+        optimising directly against the deployed score is strictly stronger than this
+        hand-built twin and is not tested at all.
+      </p>
+    </div>
+    <div class="callout warn">
+      <span class="verdict-tag">Material risk — but bounded</span>
+      <p>Against a motivated adversary this is an <strong>arms race</strong>: the naive-bot
+        defence is beaten outright by a bot that copies human feature statistics. Adversarial
+        training does answer that specific attack at a usable operating point (§3), so the
+        position is defensible rather than lost — but only against the attack you already
+        modelled, which is the general condition of this whole field.</p>
+    </div>
+
+    <h3>2.3 &nbsp;Verdict</h3>
+    <div class="callout warn">
+      <span class="verdict-tag">Conditional — a strong layered signal, not a standalone gate</span>
+      <p>
+        <strong>Robust:</strong> partially — beaten outright by feature-matched evasion unless
+        that attack is in the training set; once it is, <span class="num">58%</span> of evasive
+        bots are caught at <span class="num">0.97%</span> human FPR (§3).
+        &nbsp;<strong>Fast:</strong> yes — comfortably.
+        &nbsp;<strong>Secure enough to be the CAPTCHA:</strong> no — it is blind to the network
+        and reputation layer where most real bot traffic is cheapest to stop.
+        &nbsp;<strong>Secure enough to be one weighted input to a risk engine, behind rate
+        limiting and network reputation:</strong> yes, at a tuned threshold with drift
+        monitoring. That is a defensible product claim; "replaces reCAPTCHA" is not.
+      </p>
+    </div>
+    <div class="col">
+      <p>
+        "Better than existing CAPTCHA models used across websites" is <strong>not a
+        measurable claim.</strong> reCAPTCHA v3, Turnstile and hCaptcha are multi-signal risk
+        scorers — IP/ASN reputation, fingerprint entropy, account and cookie history, with
+        mouse dynamics as one input among dozens — trained on web-scale proprietary data and
+        updated continuously against live attackers. They publish no FPR/TPR operating points
+        and there is no shared benchmark. If that comparison is a supervisor or committee
+        requirement, it needs renegotiating now, before the manuscript is framed around a
+        claim that cannot be evidenced.
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────── TIER 5 -->
+  <section>
+    <div class="sec-head"><span class="n">03</span><h2>Follow-up: the 12.4% false-positive rate was a threshold artefact</h2></div>
+    <div class="col">
+      <p>
+        The <span class="num">12.39%</span> human FPR above is the single number that blocks
+        any operational claim, so it was worth attacking directly. It is measured at the
+        model's <em>default</em> decision — but that model's ROC-AUC against the evasive bot
+        is <span class="num">0.964</span>, which says the <em>scores</em> separate well. A
+        double-digit FPR on top of a 0.964 AUC is a badly chosen operating point, not a broken
+        model.
+      </p>
+      <p>Four attacks on it, identical held-out user split, same 18 features:</p>
+    </div>
+
+    <div class="scroll">
+      <table>
+        <caption>Tier 5 · evasive-bot recall when the threshold is set to hold human FPR at a fixed budget</caption>
+        <thead>
+          <tr><th>Variant</th><th class="n">Own-default FPR</th><th class="n">Evasive AUC</th><th class="n">@≤0.5%</th><th class="n">@≤1%</th><th class="n">@≤3%</th><th class="n">@≤5%</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="rowlead">PLAIN <span class="chip g">best</span></td><td class="n">12.39%</td><td class="n">0.9643</td><td class="n">50.1%</td><td class="n">58.3%</td><td class="n">73.6%</td><td class="n">80.3%</td></tr>
+          <tr><td class="rowlead">CLASS_BALANCED</td><td class="n">8.94%</td><td class="n">0.9641</td><td class="n">51.6%</td><td class="n">57.9%</td><td class="n">73.5%</td><td class="n">80.0%</td></tr>
+          <tr><td class="rowlead">COST_REWEIGHT</td><td class="n">3.46%</td><td class="n">0.9592</td><td class="n">46.6%</td><td class="n">54.4%</td><td class="n">71.6%</td><td class="n">78.5%</td></tr>
+          <tr><td class="rowlead">COST_EXPECTED <span class="chip n">control</span></td><td class="n">0.60%</td><td class="n">0.9643</td><td class="n">50.1%</td><td class="n">58.3%</td><td class="n">73.6%</td><td class="n">80.3%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout good">
+      <span class="verdict-tag">Blocker resolved</span>
+      <p>The unmodified model catches <strong><span class="num">58.3%</span> of evasive bots
+        and <span class="num">99.5%</span> of naive bots at <span class="num">0.97%</span>
+        human false-positive rate</strong> — simply by choosing the threshold rather than
+        accepting the default. The target set going in ("~60% evasive recall at under 3% FPR")
+        is met at under 1%.</p>
+    </div>
+
+    <div class="col">
+      <p>
+        Two secondary results are worth keeping. First, a <strong>clean negative</strong>:
+        neither class rebalancing nor cost-sensitive training beats plain threshold tuning at
+        matched FPR. CLASS_BALANCED is statistically indistinguishable
+        (<span class="num">0.9641</span> vs <span class="num">0.9643</span>) and COST_REWEIGHT
+        is measurably <em>worse</em> (<span class="num">0.9592</span>) — reweighting the
+        training data cost the forest some ranking quality to buy a lower default threshold,
+        which was free anyway. COST_EXPECTED is included as a control and lands exactly on
+        PLAIN, confirming that applying a cost matrix at inference is threshold tuning under
+        another name.
+      </p>
+      <p>
+        Second, a <strong>reject option is close to free</strong>. Deferring sessions whose
+        score falls within ±5% of the range around the threshold: coverage stays at
+        <span class="num">96.4%</span>, human FPR drops
+        <span class="num">0.97%&nbsp;→&nbsp;0.41%</span>, and evasive recall is
+        <em>unchanged</em> at <span class="num">58.3%</span>. Widening to ±10% gives
+        <span class="num">91.2%</span> coverage at <span class="num">0.11%</span> FPR for
+        <span class="num">53.7%</span> recall. In a layered system where deferred traffic goes
+        to a second signal, that is an excellent trade.
+      </p>
+    </div>
+    <div class="callout warn">
+      <span class="verdict-tag">Scope of this result</span>
+      <p>This fixes the <em>operating point</em>, not the adversarial position. All recall
+        figures are against the modelled evasive bot; a stronger adversary is untested, and
+        the underlying arms-race caveat from §2.2 stands unchanged.</p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head"><span class="n">04</span><h2>What to do next — ranked</h2></div>
+    <ol class="rec">
+      <li>
+        <span class="rl">Reframe the paper around the augmentation + evasion + operating-point arc.</span>
+        <p>The contribution is a rigorous cross-domain protocol and an honest limit:
+          augmentation fixes naive-bot transfer (AUC 0.53→0.998); a feature-matched bot
+          defeats it (0.52); adversarial training recovers it (0.964) and a tuned threshold
+          makes that usable (58% evasive recall at 0.97% FPR). That is a complete, publishable
+          arc. The 11 features become a <em>negative control</em>, not the thesis.</p>
+      </li>
+      <li>
+        <span class="rl">Fix the operating point. <span class="chip g">done</span></span>
+        <p>Resolved in §3 — <span class="num">58.3%</span> evasive recall at
+          <span class="num">0.97%</span> human FPR, with a near-free reject option on top.
+          Cost-sensitive training and class rebalancing were tested and beat nothing.</p>
+      </li>
+      <li>
+        <span class="rl">Fix the velocity artefact. <span class="chip g">done</span></span>
+        <p>Root cause was a zero-valued median, not velocity spikes (§1.3). Fixed in the
+          Tier-2 feature code only, so the Tier-1 baseline is untouched. All tiers re-run;
+          no conclusion changed.</p>
+      </li>
+      <li>
+        <span class="rl">Fix the remaining raw-velocity artefact — deliberately.</span>
+        <p>p99 raw max velocity is <span class="num">1277&nbsp;px/ms</span>, which is
+          unphysical: the 1&nbsp;ms <code>dt</code> floor is too coarse for large position
+          jumps. This one feeds <code>mean_velocity</code>/<code>std_velocity</code>, so
+          fixing it <em>will</em> move the Tier-1 baseline. Do it as an announced
+          re-baseline with before/after numbers, never silently.</p>
+      </li>
+      <li>
+        <span class="rl">Add the classifier sweep only for the benchmark table.</span>
+        <p>SVM / kNN / MLP on the same features will not move AUC (the input representation is
+          the problem, not the boundary). Run them for completeness if a reviewer expects it —
+          one afternoon — and say plainly that they do not help.</p>
+      </li>
+      <li>
+        <span class="rl">Rewrite the commercial claims.</span>
+        <p>Drop "GDPR-exempt" and "botnet immunity." Position as a self-hosted,
+          low-latency, network-independent behavioural <em>signal</em> for a layered risk
+          engine. Publish the latency benchmark with parsing overhead included.</p>
+      </li>
+      <li>
+        <span class="rl">Then, and only then, consider a sequence model.</span>
+        <p>The one genuinely different hypothesis: LSTM/GRU/CNN on raw trajectories rather than
+          aggregates. Within-Balabit authentication, an RF gets AUC ~72% and a deep model ~98%
+          — direct evidence the aggregates discard signal. But cross-domain transfer of deep
+          models is <em>untested</em> in the cited literature, and it needs a non-Weka stack.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ─────────────────────────────────────────── APPENDIX -->
+  <section>
+    <div class="sec-head"><span class="n">A</span><h2>Reference — measured numbers and method notes</h2></div>
+    <div class="scroll">
+      <table>
+        <caption>Cross-domain bot detection, DELBOT → Balabit, all tiers</caption>
+        <thead><tr><th>Setting</th><th class="n">Human FPR</th><th class="n">Bot AUC</th><th class="n">TPR @≤1% FPR</th></tr></thead>
+        <tbody>
+          <tr><td class="rowlead">Tier 1 · 7 feat · DELBOT-only (zero-shot)</td><td class="n">9.85%</td><td class="n">0.533</td><td class="n">0.00%</td></tr>
+          <tr><td class="rowlead">Tier 2 · 18 feat · DELBOT-only</td><td class="n">23.89%</td><td class="n">0.353</td><td class="n">0.21%</td></tr>
+          <tr><td class="rowlead">Tier 2 · 14 feat scale-free · DELBOT-only</td><td class="n">25.93%</td><td class="n">0.389</td><td class="n">0.14%</td></tr>
+          <tr><td class="rowlead">Tier 3 · 7 feat · action-level · DELBOT-only</td><td class="n">32.83%</td><td class="n">0.360</td><td class="n">4.09%</td></tr>
+          <tr><td class="rowlead">Tier 2 · 7 feat · + naive twins (held-out users)</td><td class="n">1.00%</td><td class="n">0.998</td><td class="n">92.9%</td></tr>
+          <tr><td class="rowlead">Tier 4 · 18 feat · + naive twins · vs evasive bot</td><td class="n">0.33%</td><td class="n">0.522</td><td class="n">0.5%</td></tr>
+          <tr><td class="rowlead">Tier 4 · 18 feat · + naive &amp; evasive twins · vs evasive bot</td><td class="n">12.39%</td><td class="n">0.964</td><td class="n">58.3%</td></tr>
+          <tr><td class="rowlead">Tier 5 · same model · threshold set to a 1% FPR budget</td><td class="n">0.97%</td><td class="n">0.964</td><td class="n">58.3%</td></tr>
+          <tr><td class="rowlead">Tier 5 · same model · + ±5% reject band</td><td class="n">0.41%</td><td class="n">0.964</td><td class="n">58.3%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col">
+      <h4>Method notes</h4>
+      <ul class="tight">
+        <li><strong>Determinism.</strong> Every eval: RandomForest <code>seed=1</code>,
+          <code>numExecutionSlots=1</code>, all <code>File.listFiles()</code> sorted. Confirmed
+          bit-identical across repeat runs.</li>
+        <li><strong>Latency bench.</strong> Warm JVM, 20,000 chunks, 7-feature model, single
+          thread. Core compute only — no request deserialization. Java&nbsp;17 / Weka&nbsp;3.8.6
+          (the brief says Java&nbsp;26; the built artefact is 17).</li>
+        <li><strong>Held-out split.</strong> Balabit's 10 users alternated over the sorted list
+          into 5 train / 5 test; no user in both. "Augmentation" numbers are semi-supervised
+          domain adaptation, not zero-shot — the FPR drop partly reflects in-domain human
+          examples in training.</li>
+        <li><strong>Synthetic bots.</strong> All from the project's own two synthesizers
+          (Bézier / minimum-jerk / burst-timing, and the feature-matched twin). No captured
+          real bot traffic, no GAN trajectories.</li>
+        <li><strong>A Weka trap worth recording.</strong> With
+          <code>minimizeExpectedCost=true</code>, <code>CostSensitiveClassifier</code>'s
+          <code>distributionForInstance</code> returns neither probabilities nor expected
+          costs — it argmins the costs and returns a hard one-hot vector. Scored naively that
+          gives two distinct values, so ROC-AUC is meaningless and every fixed-FPR sweep
+          collapses to 0%; the first Tier-5 run reported exactly that. The meaningful score is
+          the underlying forest's P(bot), read via <code>getClassifier()</code>.</li>
+        <li><strong>Citation status.</strong> Verified against source this cycle:
+          arXiv&nbsp;2504.21415 (within-dataset Balabit <em>authentication</em>, RF AUC 72% /
+          deep 98%, <em>no</em> cross-dataset test — a prior note mis-cited it as
+          "cross-dataset RF AUC 0.72"), Antal&nbsp;1810.04668 (Balabit impostor detection,
+          set-of-actions AUC 0.92, drag-drop best action), BeCAPTCHA 2005.00890 (Table&nbsp;4:
+          66.3% → 96.6%). Iliou (2021 ×2) and Wei (2019) remain unverified.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="foot">
+    <p>Review generated 2026-08-29 · sources: project logs tier2_*/tier3_*/tier4_*/tier5_*.txt,
+      balabit_validation_results.txt · branch tier2-4-cross-domain-experiments · all figures
+      re-measured after the <code>vel_p90_p50_ratio</code> fix; latency from a one-off
+      warm-JVM benchmark.</p>
+    <p>This is an internal engineering review, not a substitute for legal advice on GDPR
+      classification or for an independent replication of the cited papers.</p>
+  </div>
+
+</div>

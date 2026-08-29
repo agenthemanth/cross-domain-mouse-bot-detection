@@ -23,7 +23,9 @@ import java.util.TreeSet;
  * construction.
  *
  * Held-out Balabit user split (same as Tier2AugmentedEval). Three training sets,
- * each in BASELINE and AUGMENTED feature modes:
+ * each in five feature modes (BASELINE, AUGMENTED, SCALEFREE, AUGMENTED_SEQ,
+ * SCALEFREE_SEQ -- the *_SEQ pair add 2 temporal-ordering features that target
+ * the evasive bot's shuffled step order; see Tier2Features):
  *   DELBOT_ONLY      - no augmentation
  *   AUG_NAIVE        - + naive bot twins of train-user chunks (the Tier-2 setup)
  *   AUG_NAIVE_PLUS   - + naive AND adversarial bot twins of train-user chunks
@@ -77,7 +79,9 @@ public class Tier4AdversarialEval {
 
         List<Row> table = new ArrayList<>();
         for (Tier2Features.Mode mode : new Tier2Features.Mode[]{
-                Tier2Features.Mode.BASELINE, Tier2Features.Mode.AUGMENTED}) {
+                Tier2Features.Mode.BASELINE, Tier2Features.Mode.AUGMENTED,
+                Tier2Features.Mode.SCALEFREE, Tier2Features.Mode.AUGMENTED_SEQ,
+                Tier2Features.Mode.SCALEFREE_SEQ}) {
             Instances delbot = buildDelbot(mode, delbotFolders);
 
             for (TrainSet ts : TrainSet.values()) {
@@ -117,6 +121,12 @@ public class Tier4AdversarialEval {
         System.out.println("never trained on. AUG_NAIVE_PLUS = adversarial bots added to training too.");
         System.out.println("Adversarial bot matches source velocity distribution + path efficiency by");
         System.out.println("construction; residual tells are accel/jerk ORDER and slightly-too-smooth curvature.");
+        System.out.println();
+        System.out.println("FEATURE MODES: BASELINE 7 | AUGMENTED +11 | SCALEFREE drops absolute-magnitude");
+        System.out.println("features | *_SEQ adds 2 temporal-ordering features (velocity_lag1_autocorr,");
+        System.out.println("velocity_step_roughness) that read the step-order the shuffled evasive bot");
+        System.out.println("destroys. Only the AUG_NAIVE_PLUS rows can move -- the RF must SEE the shuffled");
+        System.out.println("signature labelled bot to use it; AUG_NAIVE stays coin-flip in every mode.");
     }
 
     // ---------------- training ----------------

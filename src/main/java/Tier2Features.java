@@ -1,6 +1,7 @@
 import weka.core.Attribute;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -41,7 +42,13 @@ import java.util.List;
  */
 public final class Tier2Features {
 
-    public enum Mode { BASELINE, AUGMENTED, SCALEFREE }
+    public enum Mode {
+        BASELINE, AUGMENTED, SCALEFREE,
+        /** AUGMENTED + 2 temporal-ordering features (Tier 6, targets the AdversarialBotSynthesizer). */
+        AUGMENTED_SEQ,
+        /** SCALEFREE + the same 2 temporal-ordering features. */
+        SCALEFREE_SEQ
+    }
 
     private Tier2Features() {}
 
@@ -59,6 +66,25 @@ public final class Tier2Features {
             "pause_ratio",            // share of steps with v < 5% of mean_v
             "vel_p90_p50_ratio"       // 90th / 50th percentile of v   -- scale-free tail weight
     };
+
+    /**
+     * TIER 6 -- 2 temporal-ORDERING features. All 18 AUGMENTED features are
+     * permutation-invariant on the per-step speed sequence, so the
+     * {@link AdversarialBotSynthesizer} (which reuses the victim chunk's own
+     * (step-distance, dt) pairs in SHUFFLED order) matches every one of them by
+     * construction. These two read the ORDER the earlier features throw away:
+     *
+     *   velocity_lag1_autocorr  -- Pearson autocorrelation of the speed series at
+     *       lag 1. Real cursor motion accelerates and decelerates smoothly, so
+     *       consecutive step speeds are strongly correlated (typ. 0.3-0.8). A
+     *       random permutation of the same speeds has expected autocorrelation ~0.
+     *   velocity_step_roughness -- mean|v[i]-v[i-1]| / mean(v). Same multiset of
+     *       speeds, but a shuffled order maximises the average successive jump,
+     *       so this runs high for the shuffled bot and low for smooth human motion.
+     *
+     * Both are dimensionless. A chunk with < 3 moving steps yields (0, 0).
+     */
+    static final String[] SEQ_NAMES = { "velocity_lag1_autocorr", "velocity_step_roughness" };
 
     /** Column names (excluding the class attribute) for the given mode. */
     static String[] featureNames(Mode mode) {
@@ -80,6 +106,10 @@ public final class Tier2Features {
                 System.arraycopy(TIER2_NAMES, 0, out, keep.length, TIER2_NAMES.length);
                 return out;
             }
+            case AUGMENTED_SEQ:
+                return concat(featureNames(Mode.AUGMENTED), SEQ_NAMES);
+            case SCALEFREE_SEQ:
+                return concat(featureNames(Mode.SCALEFREE), SEQ_NAMES);
         }
         throw new IllegalStateException();
     }
@@ -108,19 +138,70 @@ public final class Tier2Features {
         double[] t2 = tier2(pointsMs);
         if (t2 == null) return null;
 
-        if (mode == Mode.AUGMENTED) {
-            double[] out = new double[base.length + t2.length];
-            System.arraycopy(base, 0, out, 0, base.length);
-            System.arraycopy(t2, 0, out, base.length, t2.length);
-            return out;
+        boolean seq = (mode == Mode.AUGMENTED_SEQ || mode == Mode.SCALEFREE_SEQ);
+        double[] sq = seq ? seqFeatures(pointsMs) : null;
+        if (seq && sq == null) return null;
+
+        double[] head;
+        if (mode == Mode.AUGMENTED || mode == Mode.AUGMENTED_SEQ) {
+            head = new double[base.length + t2.length];
+            System.arraycopy(base, 0, head, 0, base.length);
+            System.arraycopy(t2, 0, head, base.length, t2.length);
+        } else {
+            // SCALEFREE / SCALEFREE_SEQ: num_points, duration_ms, path_efficiency (base[0,1,6]) + t2
+            head = new double[3 + t2.length];
+            head[0] = base[0];
+            head[1] = base[1];
+            head[2] = base[6];
+            System.arraycopy(t2, 0, head, 3, t2.length);
         }
-        // SCALEFREE: num_points, duration_ms, path_efficiency (base[0], base[1], base[6]) + t2
-        double[] out = new double[3 + t2.length];
-        out[0] = base[0];
-        out[1] = base[1];
-        out[2] = base[6];
-        System.arraycopy(t2, 0, out, 3, t2.length);
+        if (!seq) return head;
+        double[] out = Arrays.copyOf(head, head.length + sq.length);
+        System.arraycopy(sq, 0, out, head.length, sq.length);
         return out;
+    }
+
+    private static String[] concat(String[] a, String[] b) {
+        String[] out = new String[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
+    }
+
+    /**
+     * The 2 temporal-ordering features (see {@link #SEQ_NAMES}). Computed on the
+     * per-step speed sequence over MOVING steps, mirroring {@link #velocityTailRatio}.
+     */
+    private static double[] seqFeatures(List<double[]> pointsMs) {
+        List<double[]> p = BalabitValidationPipeline.collapseToDistinctTimestamps(pointsMs);
+        int n = p.size();
+        if (n < 4) return null;
+        int nSteps = n - 1;
+        double[] v = new double[nSteps];
+        for (int i = 1; i < n; i++) {
+            double dt = Math.max(p.get(i)[0] - p.get(i - 1)[0], MIN_DT_MS);
+            double ddx = p.get(i)[1] - p.get(i - 1)[1];
+            double ddy = p.get(i)[2] - p.get(i - 1)[2];
+            v[i - 1] = Math.sqrt(ddx * ddx + ddy * ddy) / dt;
+        }
+        double meanV = mean(v);
+        if (meanV <= EPS || nSteps < 3) return new double[]{0.0, 0.0};
+
+        double num = 0.0, den = 0.0;
+        for (int i = 0; i < nSteps; i++) {
+            double d = v[i] - meanV;
+            den += d * d;
+            if (i > 0) num += (v[i] - meanV) * (v[i - 1] - meanV);
+        }
+        double lag1 = den > EPS ? num / den : 0.0;
+
+        double roughSum = 0.0;
+        for (int i = 1; i < nSteps; i++) roughSum += Math.abs(v[i] - v[i - 1]);
+        double roughness = roughSum / ((nSteps - 1) * meanV);
+
+        if (Double.isNaN(lag1) || Double.isInfinite(lag1)
+                || Double.isNaN(roughness) || Double.isInfinite(roughness)) return null;
+        return new double[]{lag1, roughness};
     }
 
     // ---------------- the 11 Tier-2 features ----------------

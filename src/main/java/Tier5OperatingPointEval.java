@@ -86,17 +86,32 @@ public class Tier5OperatingPointEval {
             }
         }
         List<String> users = new ArrayList<>(byUser.keySet());
-        TreeSet<String> trainUsers = new TreeSet<>(), testUsers = new TreeSet<>();
-        for (int i = 0; i < users.size(); i++) (i % 2 == 0 ? trainUsers : testUsers).add(users.get(i));
-        List<List<double[]>> trainChunks = new ArrayList<>(), testChunks = new ArrayList<>();
+        TreeSet<String> trainUsers = new TreeSet<>(), calibUsers = new TreeSet<>(), reportUsers = new TreeSet<>();
+        // 3-way user split (was 2-way). Even index -> train. Of the held-out odd-index
+        // users, every 2nd one -> CALIB (threshold selection), the rest -> REPORT
+        // (the FPR/recall the paper quotes). This closes the Tier-4/5 optimism where the
+        // operating point was chosen on the very humans it was then measured against.
+        int held = 0;
+        for (int i = 0; i < users.size(); i++) {
+            if (i % 2 == 0) { trainUsers.add(users.get(i)); }
+            else { (held++ % 2 == 0 ? reportUsers : calibUsers).add(users.get(i)); }
+        }
+        List<List<double[]>> trainChunks = new ArrayList<>(), calibChunks = new ArrayList<>(), reportChunks = new ArrayList<>();
         for (String u : trainUsers) trainChunks.addAll(byUser.get(u));
-        for (String u : testUsers) testChunks.addAll(byUser.get(u));
+        for (String u : calibUsers) calibChunks.addAll(byUser.get(u));
+        for (String u : reportUsers) reportChunks.addAll(byUser.get(u));
 
-        Tier2Features.Mode mode = Tier2Features.Mode.AUGMENTED; // the Tier-4 winner
+        // Default: the Tier-4 winner (AUGMENTED, 18 feats). Pass a Tier2Features.Mode
+        // name as arg 1 to evaluate a different feature set at the same operating points
+        // (e.g. AUGMENTED_SEQ adds the 2 temporal-ordering features).
+        Tier2Features.Mode mode = (args.length > 0)
+                ? Tier2Features.Mode.valueOf(args[0].trim().toUpperCase())
+                : Tier2Features.Mode.AUGMENTED;
         System.out.println("TIER 5 -- operating-point tuning on the Tier-4 best model");
         System.out.println("features : " + mode + " (" + Tier2Features.featureNames(mode).length + ")");
-        System.out.println("TRAIN users " + trainUsers + " (" + trainChunks.size() + " chunks)");
-        System.out.println("TEST  users " + testUsers + " (" + testChunks.size() + " chunks)");
+        System.out.println("TRAIN  users " + trainUsers + " (" + trainChunks.size() + " chunks)");
+        System.out.println("CALIB  users " + calibUsers + " (" + calibChunks.size() + " chunks) -- threshold selection");
+        System.out.println("REPORT users " + reportUsers + " (" + reportChunks.size() + " chunks) -- quoted FPR / recall");
 
         Instances training = buildTraining(mode, delbotFolders, trainChunks);
         int botIdx = training.classAttribute().indexOfValue("1");
@@ -120,7 +135,7 @@ public class Tier5OperatingPointEval {
                 }
             }
             Classifier model = buildModel(v, tr, botIdx);
-            Row r = score(model, tr, botIdx, mode, testChunks, v);
+            Row r = score(model, tr, botIdx, mode, calibChunks, reportChunks, v);
             rows.add(r);
             report(r);
         }
@@ -198,14 +213,18 @@ public class Tier5OperatingPointEval {
     // ---------------- scoring ----------------
 
     private static Row score(Classifier model, Instances schema, int botIdx, Tier2Features.Mode mode,
-                             List<List<double[]>> testChunks, Variant v) throws Exception {
+                             List<List<double[]>> calibChunks, List<List<double[]>> reportChunks,
+                             Variant v) throws Exception {
+        // CALIB humans only -- used to CHOOSE the threshold for each FPR budget.
+        double[] calibHumans = scoreHumans(model, schema, botIdx, mode, calibChunks);
+
         DoubleBuf humans = new DoubleBuf(), naive = new DoubleBuf(), adv = new DoubleBuf();
         // The model's OWN default decision (classifyInstance). Using "score > 0.5" would be
         // wrong for COST_EXPECTED, whose scores are negated expected costs, not probabilities.
         int hN = 0, hBot = 0, nN = 0, nBot = 0, aN = 0, aBot = 0;
         long base = RNG_SEED * 9_000_011L;
-        for (int i = 0; i < testChunks.size(); i++) {
-            List<double[]> chunk = testChunks.get(i);
+        for (int i = 0; i < reportChunks.size(); i++) {
+            List<double[]> chunk = reportChunks.get(i);
             double[] hf = Tier2Features.compute(toMillis(chunk), mode);
             if (hf == null) continue;
             humans.add(prob(model, schema, hf, botIdx));
@@ -236,6 +255,7 @@ public class Tier5OperatingPointEval {
         r.humans = humans.toArray();
         r.naive = naive.toArray();
         r.adv = adv.toArray();
+        r.calibHumans = calibHumans;
         r.humanFprAt50 = 100.0 * hBot / hN;
         r.naiveTprAt50 = 100.0 * nBot / nN;
         r.advTprAt50 = 100.0 * aBot / aN;
@@ -247,13 +267,24 @@ public class Tier5OperatingPointEval {
         r.naiveTprAt = new double[FPR_BUDGETS.length];
         r.advTprAt = new double[FPR_BUDGETS.length];
         for (int k = 0; k < FPR_BUDGETS.length; k++) {
-            double t = thresholdForFpr(r.humans, FPR_BUDGETS[k]);
+            // threshold chosen on CALIB humans, all rates measured on the disjoint REPORT set
+            double t = thresholdForFpr(r.calibHumans, FPR_BUDGETS[k]);
             r.thresholds[k] = t;
             r.achievedFpr[k] = 100.0 * countGe(r.humans, t) / r.humans.length;
             r.naiveTprAt[k] = 100.0 * countGe(r.naive, t) / r.naive.length;
             r.advTprAt[k] = 100.0 * countGe(r.adv, t) / r.adv.length;
         }
         return r;
+    }
+
+    private static double[] scoreHumans(Classifier model, Instances schema, int botIdx,
+                                        Tier2Features.Mode mode, List<List<double[]>> chunks) throws Exception {
+        DoubleBuf b = new DoubleBuf();
+        for (List<double[]> chunk : chunks) {
+            double[] hf = Tier2Features.compute(toMillis(chunk), mode);
+            if (hf != null) b.add(prob(model, schema, hf, botIdx));
+        }
+        return b.toArray();
     }
 
     private static void report(Row r) {
@@ -264,9 +295,10 @@ public class Tier5OperatingPointEval {
                 r.humanFprAt50, r.naiveTprAt50, r.advTprAt50);
         System.out.printf("  ranking      : naiveAUC %.4f   advAUC %.4f   advEER %.2f%%%n",
                 r.naiveAuc, r.advAuc, r.advEer * 100);
-        System.out.printf("  %-14s %10s %12s %12s%n", "FPR budget", "achieved", "naive TPR", "evasive TPR");
+        System.out.println("  (threshold picked on CALIB users; every rate below measured on the disjoint REPORT users)");
+        System.out.printf("  %-14s %12s %12s %12s%n", "target FPR", "achieved FPR", "naive TPR", "evasive TPR");
         for (int k = 0; k < FPR_BUDGETS.length; k++) {
-            System.out.printf("  %-14s %9.2f%% %11.2f%% %11.2f%%%n",
+            System.out.printf("  %-14s %11.2f%% %11.2f%% %11.2f%%%n",
                     String.format("<= %.1f%%", FPR_BUDGETS[k] * 100),
                     r.achievedFpr[k], r.naiveTprAt[k], r.advTprAt[k]);
         }
@@ -285,10 +317,11 @@ public class Tier5OperatingPointEval {
             for (double t : r.advTprAt) System.out.printf(" %8.2f%%", t);
             System.out.println();
         }
-        System.out.println("\n(columns = evasive-bot recall when the threshold is set to hold human FPR");
-        System.out.println(" at or below the stated budget. The Tier-4 headline was 12.25% FPR at the");
-        System.out.println(" model's DEFAULT decision; these rows are what the same models deliver once");
-        System.out.println(" the operating point is chosen deliberately.)");
+        System.out.println("\n(columns = evasive-bot recall on the REPORT users when the threshold is set on");
+        System.out.println(" the DISJOINT CALIB users to hold their FPR at or below the stated budget. The");
+        System.out.println(" Tier-4 headline was ~12% FPR at the model's DEFAULT decision; these rows are what");
+        System.out.println(" the same models deliver once the operating point is chosen deliberately -- and");
+        System.out.println(" unlike the earlier Tier-5 run the point is now chosen on held-out humans.)");
         System.out.println("\nEXPECTED: COST_EXPECTED's advAUC must equal PLAIN's -- applying a cost matrix");
         System.out.println("to the predicted distribution is a monotone rescoring, i.e. threshold tuning by");
         System.out.println("another name. It moves the DEFAULT decision, it adds no ranking information.");
@@ -351,6 +384,7 @@ public class Tier5OperatingPointEval {
     private static final class Row {
         Variant variant;
         double[] humans, naive, adv;
+        double[] calibHumans;
         double humanFprAt50, naiveTprAt50, advTprAt50, naiveAuc, advAuc, advEer;
         double[] thresholds, achievedFpr, naiveTprAt, advTprAt;
     }

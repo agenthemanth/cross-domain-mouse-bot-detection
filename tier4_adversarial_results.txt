@@ -10,6 +10,18 @@ WARNING: core mtj jar files are not available as resources to this classloader (
 [AUGMENTED AUG_NAIVE     ] trainN=28419   humFPR= 0.36%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.97%  |  vs ADVERSARIAL: AUC=0.5257 TPR@<=1%=0.57% EER=47.23%
 [AUGMENTED AUG_NAIVE_PLUS] trainN=40880   humFPR=12.30%  |  vs NAIVE: AUC=0.9995 TPR@<=1%=99.45%  |  vs ADVERSARIAL: AUC=0.9649 TPR@<=1%=58.28% EER=10.15%
 
+[SCALEFREE DELBOT_ONLY   ] trainN=3453    humFPR=32.58%  |  vs NAIVE: AUC=0.2843 TPR@<=1%=0.00%  |  vs ADVERSARIAL: AUC=0.3638 TPR@<=1%=0.04% EER=56.85%
+[SCALEFREE AUG_NAIVE     ] trainN=28419   humFPR= 0.39%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.97%  |  vs ADVERSARIAL: AUC=0.5188 TPR@<=1%=0.53% EER=47.84%
+[SCALEFREE AUG_NAIVE_PLUS] trainN=40880   humFPR=13.15%  |  vs NAIVE: AUC=0.9993 TPR@<=1%=99.46%  |  vs ADVERSARIAL: AUC=0.9583 TPR@<=1%=56.38% EER=11.28%
+
+[AUGMENTED_SEQ DELBOT_ONLY   ] trainN=3453    humFPR=27.05%  |  vs NAIVE: AUC=0.4045 TPR@<=1%=0.00%  |  vs ADVERSARIAL: AUC=0.3656 TPR@<=1%=0.76% EER=57.69%
+[AUGMENTED_SEQ AUG_NAIVE     ] trainN=28419   humFPR= 0.38%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.98%  |  vs ADVERSARIAL: AUC=0.5063 TPR@<=1%=0.45% EER=49.09%
+[AUGMENTED_SEQ AUG_NAIVE_PLUS] trainN=40880   humFPR=11.86%  |  vs NAIVE: AUC=0.9996 TPR@<=1%=99.50%  |  vs ADVERSARIAL: AUC=0.9663 TPR@<=1%=61.18% EER=9.99%
+
+[SCALEFREE_SEQ DELBOT_ONLY   ] trainN=3453    humFPR=27.85%  |  vs NAIVE: AUC=0.2593 TPR@<=1%=0.00%  |  vs ADVERSARIAL: AUC=0.3686 TPR@<=1%=0.01% EER=56.58%
+[SCALEFREE_SEQ AUG_NAIVE     ] trainN=28419   humFPR= 0.39%  |  vs NAIVE: AUC=0.9999 TPR@<=1%=99.97%  |  vs ADVERSARIAL: AUC=0.5154 TPR@<=1%=0.45% EER=48.20%
+[SCALEFREE_SEQ AUG_NAIVE_PLUS] trainN=40880   humFPR=12.76%  |  vs NAIVE: AUC=0.9995 TPR@<=1%=99.44%  |  vs ADVERSARIAL: AUC=0.9601 TPR@<=1%=57.08% EER=11.00%
+
 ========================================================================
  TIER 4 -- EVASIVE BOT  (held-out Balabit users)
 ========================================================================
@@ -20,6 +32,15 @@ BASELINE  AUG_NAIVE_PLUS   30.93% |    0.9965     96.39% |    0.8004      7.44% 
 AUGMENTED DELBOT_ONLY      30.39% |    0.4383      0.00% |    0.3757      0.39%    56.32%
 AUGMENTED AUG_NAIVE         0.36% |    0.9999     99.97% |    0.5257      0.57%    47.23%
 AUGMENTED AUG_NAIVE_PLUS   12.30% |    0.9995     99.45% |    0.9649     58.28%    10.15%
+SCALEFREE DELBOT_ONLY      32.58% |    0.2843      0.00% |    0.3638      0.04%    56.85%
+SCALEFREE AUG_NAIVE         0.39% |    0.9999     99.97% |    0.5188      0.53%    47.84%
+SCALEFREE AUG_NAIVE_PLUS   13.15% |    0.9993     99.46% |    0.9583     56.38%    11.28%
+AUGMENTED_SEQ DELBOT_ONLY      27.05% |    0.4045      0.00% |    0.3656      0.76%    57.69%
+AUGMENTED_SEQ AUG_NAIVE         0.38% |    0.9999     99.98% |    0.5063      0.45%    49.09%
+AUGMENTED_SEQ AUG_NAIVE_PLUS   11.86% |    0.9996     99.50% |    0.9663     61.18%     9.99%
+SCALEFREE_SEQ DELBOT_ONLY      27.85% |    0.2593      0.00% |    0.3686      0.01%    56.58%
+SCALEFREE_SEQ AUG_NAIVE         0.39% |    0.9999     99.97% |    0.5154      0.45%    48.20%
+SCALEFREE_SEQ AUG_NAIVE_PLUS   12.76% |    0.9995     99.44% |    0.9601     57.08%    11.00%
 
 AUG_NAIVE vs advAUC = does the Tier-2 winner generalise to an evasive bot it
 never trained on. AUG_NAIVE_PLUS = adversarial bots added to training too.

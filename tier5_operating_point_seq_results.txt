@@ -1,5 +1,5 @@
 ﻿TIER 5 -- operating-point tuning on the Tier-4 best model
-features : AUGMENTED (18)
+features : AUGMENTED_SEQ (20)
 TRAIN  users [user12, user16, user21, user29, user7] (12483 chunks)
 CALIB  users [user20, user35] (4104 chunks) -- threshold selection
 REPORT users [user15, user23, user9] (7595 chunks) -- quoted FPR / recall
@@ -9,63 +9,63 @@ WARNING: core mtj jar files are not available as resources to this classloader (
 ------------------------------------------------------------------------
  VARIANT: PLAIN
 ------------------------------------------------------------------------
-  own default  : humanFPR  13.65%   naiveTPR  99.95%   advTPR  91.77%
-  ranking      : naiveAUC 0.9993   advAUC 0.9606   advEER 10.75%
+  own default  : humanFPR  13.22%   naiveTPR  99.95%   advTPR  91.68%
+  ranking      : naiveAUC 0.9994   advAUC 0.9623   advEER 10.55%
   (threshold picked on CALIB users; every rate below measured on the disjoint REPORT users)
   target FPR     achieved FPR    naive TPR  evasive TPR
-  <= 0.5%               1.12%       99.41%       57.63%
-  <= 1.0%               1.94%       99.56%       65.65%
-  <= 2.0%               3.45%       99.69%       73.39%
-  <= 3.0%               4.99%       99.78%       78.51%
-  <= 5.0%               7.76%       99.84%       84.89%
+  <= 0.5%               0.71%       99.35%       55.40%
+  <= 1.0%               1.72%       99.56%       65.46%
+  <= 2.0%               3.29%       99.72%       74.15%
+  <= 3.0%               4.82%       99.80%       79.54%
+  <= 5.0%               7.94%       99.84%       85.68%
 
 ------------------------------------------------------------------------
  VARIANT: CLASS_BALANCED
 ------------------------------------------------------------------------
-  own default  : humanFPR  10.16%   naiveTPR  99.84%   advTPR  87.89%
-  ranking      : naiveAUC 0.9993   advAUC 0.9595   advEER 10.95%
+  own default  : humanFPR   9.73%   naiveTPR  99.84%   advTPR  88.21%
+  ranking      : naiveAUC 0.9993   advAUC 0.9606   advEER 10.64%
   (threshold picked on CALIB users; every rate below measured on the disjoint REPORT users)
   target FPR     achieved FPR    naive TPR  evasive TPR
-  <= 0.5%               1.03%       99.46%       57.55%
-  <= 1.0%               1.71%       99.58%       64.32%
-  <= 2.0%               4.07%       99.69%       75.09%
-  <= 3.0%               5.71%       99.78%       80.26%
-  <= 5.0%               7.72%       99.84%       84.56%
+  <= 0.5%               0.86%       99.40%       55.16%
+  <= 1.0%               1.62%       99.56%       63.79%
+  <= 2.0%               3.12%       99.70%       72.98%
+  <= 3.0%               4.79%       99.74%       78.47%
+  <= 5.0%               7.47%       99.84%       84.35%
 
 ------------------------------------------------------------------------
  VARIANT: COST_REWEIGHT
 ------------------------------------------------------------------------
-  own default  : humanFPR   4.06%   naiveTPR  99.67%   advTPR  72.94%
-  ranking      : naiveAUC 0.9992   advAUC 0.9542   advEER 11.80%
+  own default  : humanFPR   3.87%   naiveTPR  99.69%   advTPR  73.05%
+  ranking      : naiveAUC 0.9992   advAUC 0.9556   advEER 11.60%
   (threshold picked on CALIB users; every rate below measured on the disjoint REPORT users)
   target FPR     achieved FPR    naive TPR  evasive TPR
-  <= 0.5%               0.96%       99.41%       52.98%
-  <= 1.0%               1.87%       99.60%       61.98%
-  <= 2.0%               3.82%       99.67%       72.28%
-  <= 3.0%               5.04%       99.70%       76.41%
-  <= 5.0%               7.91%       99.77%       82.91%
+  <= 0.5%               1.01%       99.49%       55.38%
+  <= 1.0%               1.76%       99.60%       63.18%
+  <= 2.0%               3.61%       99.68%       72.11%
+  <= 3.0%               5.27%       99.73%       77.02%
+  <= 5.0%               8.49%       99.78%       84.23%
 
 ------------------------------------------------------------------------
  VARIANT: COST_EXPECTED
 ------------------------------------------------------------------------
-  own default  : humanFPR   0.71%   naiveTPR  99.23%   advTPR  52.14%
-  ranking      : naiveAUC 0.9993   advAUC 0.9606   advEER 10.75%
+  own default  : humanFPR   0.51%   naiveTPR  99.19%   advTPR  51.20%
+  ranking      : naiveAUC 0.9994   advAUC 0.9623   advEER 10.55%
   (threshold picked on CALIB users; every rate below measured on the disjoint REPORT users)
   target FPR     achieved FPR    naive TPR  evasive TPR
-  <= 0.5%               1.12%       99.41%       57.63%
-  <= 1.0%               1.94%       99.56%       65.65%
-  <= 2.0%               3.45%       99.69%       73.39%
-  <= 3.0%               4.99%       99.78%       78.51%
-  <= 5.0%               7.76%       99.84%       84.89%
+  <= 0.5%               0.71%       99.35%       55.40%
+  <= 1.0%               1.72%       99.56%       65.46%
+  <= 2.0%               3.29%       99.72%       74.15%
+  <= 3.0%               4.82%       99.80%       79.54%
+  <= 5.0%               7.94%       99.84%       85.68%
 
 ========================================================================
  TIER 5 SUMMARY -- evasive-bot recall at fixed human-FPR budgets
 ========================================================================
 variant              ownFPR     advAUC |    <=0.5%    <=1.0%    <=2.0%    <=3.0%    <=5.0%
-PLAIN                13.65%     0.9606 |    57.63%    65.65%    73.39%    78.51%    84.89%
-CLASS_BALANCED       10.16%     0.9595 |    57.55%    64.32%    75.09%    80.26%    84.56%
-COST_REWEIGHT         4.06%     0.9542 |    52.98%    61.98%    72.28%    76.41%    82.91%
-COST_EXPECTED         0.71%     0.9606 |    57.63%    65.65%    73.39%    78.51%    84.89%
+PLAIN                13.22%     0.9623 |    55.40%    65.46%    74.15%    79.54%    85.68%
+CLASS_BALANCED        9.73%     0.9606 |    55.16%    63.79%    72.98%    78.47%    84.35%
+COST_REWEIGHT         3.87%     0.9556 |    55.38%    63.18%    72.11%    77.02%    84.23%
+COST_EXPECTED         0.51%     0.9623 |    55.40%    65.46%    74.15%    79.54%    85.68%
 
 (columns = evasive-bot recall on the REPORT users when the threshold is set on
  the DISJOINT CALIB users to hold their FPR at or below the stated budget. The
@@ -84,11 +84,11 @@ only their AUC/recall columns can legitimately differ from PLAIN.
 ========================================================================
 Decision threshold 0.8200 (the <=1% human-FPR point); score range [0.000, 1.000].
 band +/-         coverage  humanFPR|kept    advTPR|kept  naiveTPR|kept
-0% rng            100.00%          1.94%         65.65%         99.56%
-5% rng             97.04%          1.14%         67.59%         99.67%
-10% rng            94.28%          0.56%         69.13%         99.77%
-15% rng            88.71%          0.08%         63.86%         99.81%
-20% rng            17.83%          0.00%          0.00%          0.00%  <- band exceeds score ceiling; row is vacuous
+0% rng            100.00%          1.72%         65.46%         99.56%
+5% rng             97.13%          0.79%         67.01%         99.68%
+10% rng            94.21%          0.44%         68.58%         99.77%
+15% rng            88.84%          0.08%         63.10%         99.82%
+20% rng            17.84%          0.00%          0.00%          0.00%  <- band exceeds score ceiling; row is vacuous
 30% rng            16.17%          0.00%          0.00%          0.00%  <- band exceeds score ceiling; row is vacuous
 
 A reject band only helps if the deferred traffic can go somewhere useful

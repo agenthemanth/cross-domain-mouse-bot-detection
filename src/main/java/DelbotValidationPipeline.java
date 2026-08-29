@@ -5,7 +5,7 @@ import weka.attributeSelection.AttributeSelection;
 import weka.attributeSelection.InfoGainAttributeEval;
 import weka.attributeSelection.Ranker;
 import weka.classifiers.evaluation.Evaluation;
-import weka.classifiers.trees.J48;
+import weka.classifiers.trees.RandomForest;
 import weka.core.Instances;
 import weka.core.converters.CSVLoader;
 import weka.filters.Filter;
@@ -15,14 +15,17 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * Validation pipeline for the DELBOT-Mouse dataset (github.com/chrisgdt/DELBOT-Mouse, MIT license).
  * Parses raw human/bot trajectory session files, aggregates each session into the same
  * style of kinematic features used in Phase2FeatureExtraction (velocity, acceleration,
- * jerk, path efficiency), then trains/evaluates J48 and ranks features by info gain --
- * exactly mirroring the click-fraud pipeline so results are directly comparable.
+ * jerk, path efficiency), then trains/evaluates a Random Forest (100 trees) and ranks
+ * features by info gain -- exactly mirroring the click-fraud pipeline so results are
+ * directly comparable. (J48 was the earlier classifier here; kept in the project report
+ * as the interpretable baseline that caught a data-leakage issue.)
  *
  * No external JSON dependency needed: folder names already encode the label
  * (circles_human_* = human, circles_bot_* = bot), so we scan folders directly
@@ -79,6 +82,9 @@ public class DelbotValidationPipeline {
 
                 File[] sessionFiles = folder.listFiles((d, name) -> name.endsWith(".txt"));
                 if (sessionFiles == null) continue;
+                Arrays.sort(sessionFiles); // deterministic instance order: RandomForest's
+                                           // bootstrap sampling is order-sensitive even at a
+                                           // fixed seed (matches BalabitValidationPipeline).
 
                 for (File file : sessionFiles) {
                     SessionFeatures f = parseSession(file, label);
@@ -150,21 +156,19 @@ public class DelbotValidationPipeline {
             System.out.println("Number of classes: " + nominalDataset.numClasses());
 
             long trainStart = System.currentTimeMillis();
-            J48 tree = new J48();
-            tree.setMinNumObj(20);
-            tree.setBinarySplits(true);
-            tree.buildClassifier(nominalDataset);
-            System.out.println("\nJ48 Decision Tree built in " + (System.currentTimeMillis() - trainStart) + " ms.");
-
-            System.out.println("\n--- TREE ---");
-            System.out.println(tree.toString());
+            RandomForest forest = new RandomForest();
+            forest.setNumIterations(100);
+            forest.buildClassifier(nominalDataset);
+            System.out.println("\nRandom Forest (100 trees) built in " + (System.currentTimeMillis() - trainStart) + " ms.");
+            // Note: no single readable tree to print for an ensemble -- see project report
+            // for the earlier J48 comparison run and its readable tree output.
 
             Evaluation eval = new Evaluation(nominalDataset);
-            eval.crossValidateModel(new J48(), nominalDataset, 5, new java.util.Random(1));
+            eval.crossValidateModel(new RandomForest(), nominalDataset, 5, new java.util.Random(1));
             System.out.println("5-fold Cross-Validated Accuracy: " + String.format("%.2f", eval.pctCorrect()) + "%");
 
             Evaluation trainEval = new Evaluation(nominalDataset);
-            trainEval.evaluateModel(tree, nominalDataset);
+            trainEval.evaluateModel(forest, nominalDataset);
             System.out.println("Training Accuracy: " + String.format("%.2f", trainEval.pctCorrect()) + "%");
 
             // --- Info gain ranking, mirroring Phase2's diagnostic ---
@@ -195,6 +199,7 @@ public class DelbotValidationPipeline {
     private static void findSessionFolders(File dir, List<File> found) {
         File[] children = dir.listFiles(File::isDirectory);
         if (children == null) return;
+        Arrays.sort(children); // deterministic DFS order regardless of filesystem
         for (File child : children) {
             String name = child.getName();
             if (name.startsWith("circles_human") || name.startsWith("circles_bot")) {
@@ -261,6 +266,18 @@ public class DelbotValidationPipeline {
             );
             double pathEfficiency = Math.min(straightLineDist / (totalDist + 1e-5), 1.0);
             double durationMs = points.get(points.size() - 1)[0] - points.get(0)[0];
+
+            // Reject any session with a NaN/Infinite feature. DELBOT's touch files
+            // (circles_human_tel) log the coordinate text "NaN" on trailing ReleasedTouch
+            // rows; Double.parseDouble("NaN") returns NaN without throwing, so those points
+            // are parsed and poison the aggregates. This guard mirrors the one at the end of
+            // BalabitValidationPipeline.computeFeatures, so this in-domain pipeline trains on
+            // the SAME DELBOT rows (857 human / 2596 bot) as the cross-dataset pipelines --
+            // previously the 98 circles_human_tel sessions leaked in here as missing-value rows.
+            double[] feats = {meanVel, stdVel, meanAcc, meanJerk, pathEfficiency, durationMs};
+            for (double v : feats) {
+                if (Double.isNaN(v) || Double.isInfinite(v)) return null;
+            }
 
             SessionFeatures f = new SessionFeatures();
             f.numPoints = points.size();

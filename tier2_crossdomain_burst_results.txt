@@ -1,0 +1,58 @@
+Synthetic-bot timing model: BURST  (pass MATCHED_SPREAD | BURST as arg 1)
+DELBOT session folders: 10 | Balabit raw session files: 1676
+
+########################################################################
+# MODE: BASELINE   features: num_points, duration_ms, mean_velocity, std_velocity, mean_acceleration, mean_jerk, path_efficiency
+########################################################################
+  DELBOT training: 3453 instances (857 human / 2596 bot), 7 features
+  human FPR @0.5 : 9.85%  (2381 / 24182)
+  bot type                         TPR@.5      AUC      EER   TPR@<=1%   TPR@<=5%
+  MODERATE_LINEAR                   0.00%   0.4571   51.34%      0.00%      0.00%
+  MODERATE_LINEAR_VP                0.00%   0.5228   47.08%      0.00%      0.00%
+  ADVANCED_BEZIER                   0.05%   0.4641   50.15%      0.00%      0.03%
+  ADVANCED_BEZIER_VP_JITTER         0.05%   0.4616   51.11%      0.00%      0.01%
+  POOLED                            0.03%   0.4764   50.51%      0.00%      0.01%
+
+########################################################################
+# MODE: AUGMENTED   features: num_points, duration_ms, mean_velocity, std_velocity, mean_acceleration, mean_jerk, path_efficiency, velocity_cv, accel_to_vel_ratio, jerk_to_vel_ratio, time_to_peak_vel_ratio, accel_fraction, dir_reversal_rate, mean_turning_angle, std_turning_angle, mean_curvature, pause_ratio, vel_p90_p50_ratio
+########################################################################
+  DELBOT training: 3453 instances (857 human / 2596 bot), 18 features
+  human FPR @0.5 : 22.83%  (5520 / 24182)
+  bot type                         TPR@.5      AUC      EER   TPR@<=1%   TPR@<=5%
+  MODERATE_LINEAR                   0.00%   0.2991   59.62%      0.00%      0.00%
+  MODERATE_LINEAR_VP                0.01%   0.2218   67.14%      0.00%      0.00%
+  ADVANCED_BEZIER                   0.12%   0.3008   58.82%      0.00%      0.00%
+  ADVANCED_BEZIER_VP_JITTER        86.56%   0.8404   20.71%      0.00%      1.97%
+  POOLED                           21.68%   0.4155   54.76%      0.00%      0.50%
+
+########################################################################
+# MODE: SCALEFREE   features: num_points, duration_ms, path_efficiency, velocity_cv, accel_to_vel_ratio, jerk_to_vel_ratio, time_to_peak_vel_ratio, accel_fraction, dir_reversal_rate, mean_turning_angle, std_turning_angle, mean_curvature, pause_ratio, vel_p90_p50_ratio
+########################################################################
+  DELBOT training: 3453 instances (857 human / 2596 bot), 14 features
+  human FPR @0.5 : 26.02%  (6293 / 24182)
+  bot type                         TPR@.5      AUC      EER   TPR@<=1%   TPR@<=5%
+  MODERATE_LINEAR                   0.11%   0.1937   73.31%      0.00%      0.00%
+  MODERATE_LINEAR_VP                0.52%   0.2063   71.77%      0.00%      0.00%
+  ADVANCED_BEZIER                   0.02%   0.2035   72.60%      0.00%      0.00%
+  ADVANCED_BEZIER_VP_JITTER        85.95%   0.7565   24.80%      0.01%      0.47%
+  POOLED                           21.65%   0.3400   63.62%      0.00%      0.12%
+
+========================================================================
+ TIER 2 BEFORE / AFTER  (cross-domain: DELBOT-trained -> Balabit)
+========================================================================
+mode         #feat   humanFPR  pooledAUC pooledEER TPR@<=1%FPR TPR@<=5%FPR
+BASELINE         7      9.85%     0.4764    50.51%       0.00%       0.01%
+AUGMENTED       18     22.83%     0.4155    54.76%       0.00%       0.50%
+SCALEFREE       14     26.02%     0.3400    63.62%       0.00%       0.12%
+
+Per-bot-type pooled ROC-AUC:
+bot type                         BASELINE  AUGMENTED  SCALEFREE
+MODERATE_LINEAR                    0.4571     0.2991     0.1937
+MODERATE_LINEAR_VP                 0.5228     0.2218     0.2063
+ADVANCED_BEZIER                    0.4641     0.3008     0.2035
+ADVANCED_BEZIER_VP_JITTER          0.4616     0.8404     0.7565
+
+Interpretation guide: AUC ~0.50 = no cross-domain discrimination (Tier-1 result
+was 0.53). A material rise in SCALEFREE/AUGMENTED AUC with humanFPR held near or
+below the 9.85% baseline is the Tier-2 win condition. Synthetic bots are an
+optimistic bound (no GAN trajectories) -- see BalabitBotSynthesizer.

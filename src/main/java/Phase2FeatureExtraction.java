@@ -2,7 +2,7 @@ import tech.tablesaw.api.DoubleColumn;
 import tech.tablesaw.api.NumericColumn;
 import tech.tablesaw.api.Table;
 import weka.classifiers.evaluation.Evaluation;
-import weka.classifiers.trees.J48;
+import weka.classifiers.trees.RandomForest;
 import weka.core.Instances;
 import weka.core.converters.CSVLoader;
 import weka.filters.Filter;
@@ -105,8 +105,8 @@ public class Phase2FeatureExtraction {
 
             // Exact target class setting: locate is_fraudulent BY NAME, convert
             // strictly that one column to nominal, leave every other numeric
-            // predictor as continuous so J48 uses <= threshold splits, not
-            // categorical equality matching.
+            // predictor as continuous so the forest's trees use <= threshold
+            // splits, not categorical equality matching.
             int classIndex = cleanDataset.attribute("is_fraudulent").index();
             cleanDataset.setClassIndex(classIndex);
 
@@ -175,18 +175,29 @@ public class Phase2FeatureExtraction {
         System.out.println("Features used: " + (dataset.numAttributes() - 1));
 
         long trainStart = System.currentTimeMillis();
-        J48 tree = new J48();
-        tree.setMinNumObj(20);
-        tree.setBinarySplits(true);
-        tree.buildClassifier(dataset);
+        RandomForest forest = new RandomForest();
+        forest.setNumIterations(100);
+        forest.buildClassifier(dataset);
         long trainMs = System.currentTimeMillis() - trainStart;
-        System.out.println("J48 Decision Tree built in " + trainMs + " ms.");
+        System.out.println("Random Forest (100 trees) built in " + trainMs + " ms.");
+        // Note: unlike J48, a Random Forest has no single readable tree structure to print --
+        // it's an ensemble of 100 trees voting. See the project report for the earlier J48
+        // comparison run, which was used specifically to catch the data-leakage issue via
+        // its readable tree output before switching to this higher-performing ensemble.
 
-        System.out.println("\n--- TREE ---");
-        System.out.println(tree.toString());
+        // IMPORTANT: Random Forest's individual trees are unconstrained here (no equivalent
+        // of J48's minNumObj=20), so training accuracy alone can trivially hit ~100% by
+        // memorizing rows even when there is no real signal in the data -- exactly what
+        // happened on Run B before this fix. Cross-validated accuracy is the honest number;
+        // training accuracy is kept only for reference/comparison, never as the headline result.
+        Evaluation trainEval = new Evaluation(dataset);
+        trainEval.evaluateModel(forest, dataset);
+        System.out.println("Training Accuracy (reference only, expect inflated/overfit): "
+                + String.format("%.2f", trainEval.pctCorrect()) + "%");
 
-        Evaluation eval = new Evaluation(dataset);
-        eval.evaluateModel(tree, dataset);
-        System.out.println("Training Accuracy: " + String.format("%.2f", eval.pctCorrect()) + "%");
+        Evaluation cvEval = new Evaluation(dataset);
+        cvEval.crossValidateModel(new RandomForest(), dataset, 5, new java.util.Random(1));
+        System.out.println("5-fold Cross-Validated Accuracy (the real, honest number): "
+                + String.format("%.2f", cvEval.pctCorrect()) + "%");
     }
 }

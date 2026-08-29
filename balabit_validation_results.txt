@@ -1,0 +1,49 @@
+﻿--- STEP 1: TRAIN RANDOM FOREST ON DELBOT ONLY ---
+Found 10 DELBOT session folders.
+[1/10] circles_bot_gan
+[2/10] circles_bot_naturalmousemotion
+[3/10] circles_bot_pyhm
+[4/10] circles_bot_pynput
+[5/10] circles_human_fast
+[6/10] circles_human_pc1
+[7/10] circles_human_pc2
+[8/10] circles_human_pc2_pad
+[9/10] circles_human_tel
+[10/10] circles_human_vm
+DELBOT training instances: 3453
+WARNING: core mtj jar files are not available as resources to this classloader (jdk.internal.loader.ClassLoaders$AppClassLoader@105be200)
+Random Forest trained (100 trees).
+
+--- STEP 2: EVALUATE ON BALABIT (independent, real-coordinate human data) ---
+Found 1676 Balabit raw session files.
+  ...processed 200/1676 raw files, 2090 sessions evaluated so far
+  ...processed 400/1676 raw files, 4089 sessions evaluated so far
+  ...processed 600/1676 raw files, 5716 sessions evaluated so far
+  ...processed 800/1676 raw files, 7499 sessions evaluated so far
+  ...processed 1000/1676 raw files, 9154 sessions evaluated so far
+  ...processed 1200/1676 raw files, 10846 sessions evaluated so far
+  ...processed 1400/1676 raw files, 12435 sessions evaluated so far
+  ...processed 1600/1676 raw files, 14196 sessions evaluated so far
+
+Total Balabit sessions evaluated: 24182
+False positives (predicted bot, truly human): 2381
+Balabit False Positive Rate: 9.85%
+
+--- FALSE POSITIVE RATE BY USER ---
+user         sessions        FPs       FPR%
+user12           4557        342      7.50%
+user15           3702        509     13.75%
+user16           2810        256      9.11%
+user20           1701        151      8.88%
+user21           1505        168     11.16%
+user23           2047        156      7.62%
+user29           1821        149      8.18%
+user35           2403        279     11.61%
+user7            1790        173      9.66%
+user9            1846        198     10.73%
+
+--- COMPARISON TO MIGHTYMERGE (run FalsePositiveEvaluator for that number) ---
+mightymerge.io FPR was 2.18% (browsing-style human behavior).
+Balabit FPR above reflects continuous administrative/work-task mouse behavior --
+a genuinely different behavioral context. A gap between these two numbers is a
+real, reportable finding about generalization boundaries, not a bug.

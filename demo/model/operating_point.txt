@@ -1,0 +1,15 @@
+model            : AUGMENTED-18 / AUG_NAIVE_PLUS / RF 100 trees seed 1
+P(bot) threshold : 0.8700   (1% human-FPR budget on held-out users)
+                   tier5_operating_point_results.txt reject-option section quotes 0.8200
+held-out users   : [user15, user20, user23, user35, user9]
+
+AT THIS THRESHOLD (held-out Balabit users -- NOT a demo-page domain):
+  human false-positive rate : 0.89%
+  naive-bot recall          : 99.45%
+  evasive-bot recall        : 58.28%
+
+RANKING (threshold-independent):
+  naive-bot ROC-AUC   : 0.9995
+  evasive-bot ROC-AUC : 0.9649
+
+default 0.5 threshold human FPR : 12.30%   (why the operating point is moved)

@@ -1,0 +1,23 @@
+@relation demo_AUGMENTED
+
+@attribute num_points numeric
+@attribute duration_ms numeric
+@attribute mean_velocity numeric
+@attribute std_velocity numeric
+@attribute mean_acceleration numeric
+@attribute mean_jerk numeric
+@attribute path_efficiency numeric
+@attribute velocity_cv numeric
+@attribute accel_to_vel_ratio numeric
+@attribute jerk_to_vel_ratio numeric
+@attribute time_to_peak_vel_ratio numeric
+@attribute accel_fraction numeric
+@attribute dir_reversal_rate numeric
+@attribute mean_turning_angle numeric
+@attribute std_turning_angle numeric
+@attribute mean_curvature numeric
+@attribute pause_ratio numeric
+@attribute vel_p90_p50_ratio numeric
+@attribute is_bot {0,1}
+
+@data

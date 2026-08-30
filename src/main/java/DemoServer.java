@@ -26,7 +26,8 @@ import java.util.regex.Pattern;
  *   java -cp "target/classes;<weka>;<bounce>" DemoServer         (port 8787)
  *   java -cp "..." DemoServer 9000                               (custom port)
  *
- * GET  /                       -> demo/index.html
+ * GET  /                       -> demo/index.html  (Meander landing page)
+ * GET  /lab.html               -> the live detector
  * GET  /features.js , /demo.js , /model/golden_vectors.json , ...
  * POST /score   body {"features":[<18 numbers>]}
  *              -> {"score":0.93,"label":"BOT","threshold":0.87}

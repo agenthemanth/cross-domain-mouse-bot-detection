@@ -1,9 +1,17 @@
-# Live demo — mouse-dynamics bot detector
+# Meander — mouse-dynamics bot detector demo
 
-Browser front end for the frozen `AUGMENTED-18 / AUG_NAIVE_PLUS` Random Forest.
-Covers gaps 1–3 from the plan (model selection + serialization, capture→feature
-bridge, live scoring). Gaps 4–5 (per-context recalibration, real captured-bot
-validation) are out of scope and stated as limitations on the page.
+Two pages, served by `DemoServer`:
+
+- **`/`** (`demo/index.html`) — the landing page. Organic / Fluid style, product
+  concept "Meander". One scrolling narrative: living motion has a shape → what the
+  model reads → honest arms-race numbers → CTA into the detector.
+- **`/lab.html`** — the live detector (Liquid Glass). Move the mouse for a P(bot)
+  score; bot-sim buttons; movable decision line.
+
+Front end for the frozen `AUGMENTED-18 / AUG_NAIVE_PLUS` Random Forest. Covers
+gaps 1–3 from the plan (model selection + serialization, capture→feature bridge,
+live scoring). Gaps 4–5 (per-context recalibration, real captured-bot validation)
+are out of scope and stated as limitations on the page.
 
 ## One-time: freeze the model
 

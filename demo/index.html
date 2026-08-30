@@ -4,118 +4,217 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mouse-Dynamics Bot Detector — live demo</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
   :root{
-    --bg:#0E1210; --panel:#161B18; --panel-2:#1D2420; --line:#28302B;
-    --ink:#E4E8E4; --ink-soft:#9AA39C; --ink-faint:#6B746D;
-    --accent:#5FB48D; --human:#5FB48D; --bot:#E4796C; --warn:#D6A85C;
-    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-    --sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    /* ambient field */
+    --void:#070a12;
+    --orb-1:#6f5cff;   /* violet  */
+    --orb-2:#25e6c5;   /* teal    */
+    --orb-3:#ff5c8a;   /* magenta */
+    --orb-4:#4d84ff;   /* blue    */
+
+    /* glass */
+    --glass:rgba(255,255,255,.055);
+    --glass-hi:rgba(255,255,255,.10);
+    --edge:rgba(255,255,255,.14);
+    --edge-lit:rgba(255,255,255,.42);
+    --shadow:0 24px 70px -24px rgba(0,0,0,.65);
+    --inner:inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(0,0,0,.18);
+
+    /* ink */
+    --ink:rgba(255,255,255,.95);
+    --ink-soft:rgba(255,255,255,.60);
+    --ink-faint:rgba(255,255,255,.38);
+
+    /* state */
+    --human:#5fe9b6;
+    --bot:#ff7d6c;
+    --warn:#ffce6b;
+
+    --r-lg:26px; --r-md:15px; --r-sm:10px;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;
+    --mono:"SF Mono",ui-monospace,SFMono-Regular,Menlo,"Cascadia Mono",monospace;
   }
+
   *{box-sizing:border-box;margin:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
-    line-height:1.5;padding:28px;min-height:100vh}
-  .shell{max-width:1080px;margin:0 auto;display:grid;gap:20px;
-    grid-template-columns:1fr 340px}
-  header{grid-column:1/-1}
-  h1{font-family:var(--mono);font-weight:600;font-size:20px;letter-spacing:-.01em}
-  .sub{color:var(--ink-soft);font-size:13.5px;margin-top:4px;max-width:70ch}
-  .sub code{font-family:var(--mono);font-size:12px;background:var(--panel-2);
-    padding:1px 5px;border-radius:3px}
+  html,body{height:100%}
+  body{
+    font-family:var(--sans);color:var(--ink);line-height:1.5;
+    background:var(--void);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+  }
 
-  .arena{position:relative;background:var(--panel);border:1px solid var(--line);
-    border-radius:12px;height:440px;overflow:hidden;cursor:crosshair;
-    display:flex;align-items:center;justify-content:center}
-  .arena .hint{font-family:var(--mono);font-size:13px;color:var(--ink-faint);
-    text-align:center;pointer-events:none;transition:opacity .3s}
-  .arena.active .hint{opacity:0}
+  /* ---------- ambient depth layer ---------- */
+  .ambient{position:fixed;inset:-20vmax;z-index:-1;filter:blur(70px) saturate(150%);pointer-events:none}
+  .ambient span{position:absolute;border-radius:50%;opacity:.55;mix-blend-mode:screen}
+  .ambient .a{width:52vmax;height:52vmax;left:-8vmax;top:-10vmax;background:radial-gradient(circle at 30% 30%,var(--orb-1),transparent 62%);animation:drift1 34s ease-in-out infinite}
+  .ambient .b{width:46vmax;height:46vmax;right:-6vmax;top:6vmax;background:radial-gradient(circle at 60% 40%,var(--orb-2),transparent 60%);animation:drift2 40s ease-in-out infinite}
+  .ambient .c{width:44vmax;height:44vmax;left:18vmax;bottom:-14vmax;background:radial-gradient(circle at 50% 50%,var(--orb-3),transparent 60%);animation:drift3 46s ease-in-out infinite}
+  .ambient .d{width:38vmax;height:38vmax;right:10vmax;bottom:-6vmax;background:radial-gradient(circle at 40% 60%,var(--orb-4),transparent 62%);animation:drift1 52s ease-in-out infinite reverse}
+  @keyframes drift1{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(6vmax,4vmax,0)}}
+  @keyframes drift2{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-5vmax,5vmax,0)}}
+  @keyframes drift3{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(4vmax,-6vmax,0)}}
+
+  /* ---------- glass surface ---------- */
+  .glass{
+    position:relative;
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(30px) saturate(165%);
+    backdrop-filter:blur(30px) saturate(165%);
+    border:1px solid var(--edge);
+    border-radius:var(--r-lg);
+    box-shadow:var(--shadow),var(--inner);
+  }
+  .glass::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(175deg,var(--edge-lit),transparent 34%);
+    -webkit-mask:linear-gradient(#000,transparent 46%);mask:linear-gradient(#000,transparent 46%);
+    opacity:.7;
+  }
+
+  /* ---------- layout ---------- */
+  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 64px;
+    display:grid;grid-template-columns:1fr 372px;gap:22px;align-items:start}
+  header{grid-column:1/-1;padding:26px 30px;display:flex;flex-direction:column;gap:6px}
+  h1{font-size:23px;font-weight:600;letter-spacing:-.018em}
+  .sub{color:var(--ink-soft);font-size:13.5px;max-width:74ch;letter-spacing:-.005em}
+  .sub code{font-family:var(--mono);font-size:11.5px;color:var(--ink);
+    background:var(--glass-hi);padding:1px 6px;border-radius:6px;border:1px solid var(--edge)}
+
+  /* ---------- arena ---------- */
+  .arena{
+    position:relative;height:472px;overflow:hidden;cursor:crosshair;
+    border-radius:var(--r-lg);
+    background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
+    -webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);
+    border:1px solid var(--edge);box-shadow:var(--shadow),var(--inner);
+    display:flex;align-items:center;justify-content:center;
+  }
   canvas.trail{position:absolute;inset:0;width:100%;height:100%}
+  .hint{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);text-align:center;
+    pointer-events:none;transition:opacity .4s ease;line-height:1.9;letter-spacing:.02em}
+  .arena.active .hint{opacity:0}
 
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
-    padding:18px}
-  .panel h2{font-family:var(--mono);font-size:11px;letter-spacing:.12em;
-    text-transform:uppercase;color:var(--ink-faint);font-weight:600;margin-bottom:14px}
+  /* ---------- panel ---------- */
+  .panel{padding:22px}
+  .panel h2{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--ink-faint);margin-bottom:15px}
 
-  .verdict{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
-  .verdict .label{font-family:var(--mono);font-weight:600;font-size:26px}
-  .verdict .label.human{color:var(--human)}
-  .verdict .label.bot{color:var(--bot)}
+  .verdict{display:flex;align-items:baseline;gap:11px;margin-bottom:2px}
+  .verdict .label{font-size:30px;font-weight:600;letter-spacing:-.02em;transition:color .3s ease}
+  .verdict .label.human{color:var(--human);text-shadow:0 0 24px rgba(95,233,182,.45)}
+  .verdict .label.bot{color:var(--bot);text-shadow:0 0 24px rgba(255,125,108,.45)}
   .verdict .label.idle{color:var(--ink-faint)}
-  .verdict .p{font-family:var(--mono);font-size:13px;color:var(--ink-soft)}
+  .verdict .p{font-family:var(--mono);font-size:12px;color:var(--ink-soft);letter-spacing:-.01em}
 
-  .meter{height:12px;background:var(--panel-2);border-radius:6px;position:relative;
-    overflow:hidden;margin:12px 0 6px}
-  .meter .fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);
-    transition:width .25s ease, background .25s}
-  .meter .thr{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--warn)}
-  .scale{display:flex;justify-content:space-between;font-family:var(--mono);
-    font-size:10.5px;color:var(--ink-faint)}
-  .thr-ctl{display:block;margin-top:10px}
-  .thr-ctl #thrNote{font-family:var(--mono);font-size:11px;color:var(--warn);display:block}
-  .thr-ctl input[type=range]{width:100%;margin:6px 0 2px;accent-color:var(--warn)}
-  .thr-hint{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);cursor:pointer}
-  .catch{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);margin-top:12px}
-  .catch b{color:var(--ink)}
+  .meter{position:relative;height:14px;margin:16px 0 7px;border-radius:999px;overflow:hidden;
+    background:rgba(0,0,0,.32);box-shadow:inset 0 1px 3px rgba(0,0,0,.5),inset 0 -1px 0 rgba(255,255,255,.06)}
+  .meter .fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;
+    background:linear-gradient(90deg,#2fbf8f,var(--human));
+    box-shadow:0 0 18px rgba(95,233,182,.5);
+    transition:width .35s cubic-bezier(.32,.9,.32,1),background .3s ease,box-shadow .3s ease}
+  .meter .fill.bot{background:linear-gradient(90deg,#ff5c7a,var(--bot));
+    box-shadow:0 0 20px rgba(255,125,108,.55)}
+  .meter .thr{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--warn);
+    box-shadow:0 0 10px rgba(255,206,107,.8);transition:left .18s ease}
+  .scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;
+    color:var(--ink-faint);letter-spacing:.03em}
 
-  .stats{font-family:var(--mono);font-size:12px;color:var(--ink-soft);
-    display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin-top:14px}
-  .stats b{color:var(--ink);font-weight:500}
+  .thr-ctl{display:block;margin-top:13px}
+  .thr-ctl #thrNote{font-family:var(--mono);font-size:10.5px;color:var(--warn);
+    display:block;letter-spacing:.02em}
+  .thr-ctl input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:26px;margin:2px 0 0;background:transparent;cursor:pointer}
+  .thr-ctl input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:999px;
+    background:linear-gradient(90deg,rgba(255,206,107,.25),rgba(255,206,107,.6))}
+  .thr-ctl input[type=range]::-moz-range-track{height:5px;border-radius:999px;background:rgba(255,206,107,.4)}
+  .thr-ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:16px;height:16px;margin-top:-6px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff,#ffce6b 70%);
+    border:1px solid rgba(255,255,255,.6);box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 12px rgba(255,206,107,.6)}
+  .thr-ctl input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;border:1px solid #fff;
+    background:#ffce6b;box-shadow:0 0 12px rgba(255,206,107,.6)}
+  .thr-hint{font-family:var(--mono);font-size:10px;color:var(--ink-faint);cursor:pointer;
+    letter-spacing:.02em;transition:color .2s}
+  .thr-hint:hover{color:var(--ink-soft)}
 
-  .btn{display:block;width:100%;font-family:var(--mono);font-size:13px;font-weight:500;
-    padding:10px 12px;border-radius:8px;border:1px solid var(--line);
-    background:var(--panel-2);color:var(--ink);cursor:pointer;margin-top:8px;
-    text-align:left;transition:border-color .15s}
-  .btn:hover{border-color:var(--accent)}
-  .btn:disabled{opacity:.5;cursor:default}
+  .stats{display:grid;grid-template-columns:1fr auto;gap:6px 14px;margin-top:16px;
+    font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);letter-spacing:-.01em}
+  .stats b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+
+  .btn{display:block;width:100%;text-align:left;margin-top:9px;
+    font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:-.005em;
+    padding:11px 14px;border-radius:var(--r-md);color:var(--ink);
+    background:var(--glass-hi);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+    border:1px solid var(--edge);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.14);
+    cursor:pointer;transition:transform .16s ease,background .2s ease,box-shadow .2s ease,border-color .2s ease}
+  .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.15);
+    border-color:var(--edge-lit);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 8px 22px -10px rgba(0,0,0,.6)}
+  .btn:active{transform:translateY(0)}
   .btn .k{color:var(--ink-faint)}
 
-  .log{grid-column:1/-1;background:var(--panel);border:1px solid var(--line);
-    border-radius:12px;padding:16px 18px}
-  .log h2{font-family:var(--mono);font-size:11px;letter-spacing:.12em;
-    text-transform:uppercase;color:var(--ink-faint);font-weight:600;margin-bottom:10px}
-  .log .rows{font-family:var(--mono);font-size:12px;max-height:150px;overflow-y:auto}
-  .log .row{display:grid;grid-template-columns:64px 90px 1fr auto;gap:12px;
-    padding:3px 0;border-bottom:1px solid var(--line);color:var(--ink-soft)}
-  .log .row:last-child{border:none}
-  .log .row .v.human{color:var(--human)}
-  .log .row .v.bot{color:var(--bot)}
+  .catch{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:14px;letter-spacing:-.01em}
+  .catch b{color:var(--ink);font-variant-numeric:tabular-nums}
 
-  .disclaimer{grid-column:1/-1;font-size:12.5px;color:var(--ink-faint);
-    border-top:1px solid var(--line);padding-top:14px;line-height:1.6}
-  .disclaimer b{color:var(--warn);font-family:var(--mono);font-size:11px}
+  /* ---------- log ---------- */
+  .log{grid-column:1/-1;padding:20px 24px}
+  .log h2{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--ink-faint);margin-bottom:12px}
+  .rows{font-family:var(--mono);font-size:11.5px;max-height:158px;overflow-y:auto}
+  .row{display:grid;grid-template-columns:66px 96px 1fr auto;gap:14px;padding:4px 0;
+    border-bottom:1px solid rgba(255,255,255,.07);color:var(--ink-soft);
+    font-variant-numeric:tabular-nums}
+  .row:last-child{border:none}
+  .row .v.human{color:var(--human)}
+  .row .v.bot{color:var(--bot)}
 
-  @media(max-width:820px){.shell{grid-template-columns:1fr}}
+  /* ---------- disclaimer ---------- */
+  .disclaimer{grid-column:1/-1;padding:18px 24px;font-size:12px;color:var(--ink-faint);
+    line-height:1.65;letter-spacing:-.005em}
+  .disclaimer b{color:var(--ink-soft);font-family:var(--mono);font-size:10.5px;letter-spacing:.02em}
+  .disclaimer em{font-style:normal;color:var(--ink-soft)}
+
+  @media (max-width:900px){.wrap{grid-template-columns:1fr}}
+  @media (prefers-reduced-motion:reduce){
+    .ambient span{animation:none}
+    .fill,.thr,.btn,.hint{transition:none}
+  }
 </style>
 </head>
 <body>
-<div class="shell">
-  <header>
+
+<div class="ambient" aria-hidden="true">
+  <span class="a"></span><span class="b"></span><span class="c"></span><span class="d"></span>
+</div>
+
+<div class="wrap">
+  <header class="glass">
     <h1>Mouse-Dynamics Bot Detector</h1>
     <p class="sub">Live scoring with the frozen <code>AUGMENTED-18 / AUG_NAIVE_PLUS</code>
-      Random Forest. The browser computes the 18 features (bit-parity with the Java
-      pipeline, verified by <code>demo/parity.js</code>) and posts them to a local
+      Random Forest. The browser computes the 18 features — bit-parity with the Java
+      pipeline, verified by <code>demo/parity.js</code> — and posts them to a local
       scorer. Chunks are gap-split at 3&nbsp;s and need ≥20 distinct-time samples.</p>
   </header>
 
   <div class="arena" id="arena">
     <canvas class="trail" id="trail"></canvas>
-    <div class="hint">move your mouse in here<br>— a verdict updates as you go —</div>
+    <div class="hint">move your mouse in here<br>a verdict updates as you go</div>
   </div>
 
-  <div class="panel">
+  <div class="panel glass">
     <h2>Current chunk</h2>
     <div class="verdict">
       <span class="label idle" id="verdict">—</span>
       <span class="p" id="prob">P(bot) = ·</span>
     </div>
     <div class="meter">
-      <div class="fill" id="fill" style="width:0%"></div>
+      <div class="fill" id="fill"></div>
       <div class="thr" id="thr" style="left:87%"></div>
     </div>
-    <div class="scale"><span>0.0 human</span><span>1.0 bot</span></div>
+    <div class="scale"><span>0.0 · human</span><span>bot · 1.0</span></div>
 
     <label class="thr-ctl">
       <span id="thrNote">decision line P(bot) ≥ 0.87</span>
@@ -131,34 +230,34 @@
       <span>pause ratio</span><b id="sPause">·</b>
     </div>
 
-    <h2 style="margin-top:20px">Simulate a bot</h2>
-    <button class="btn" id="btnBezier"><span class="k">▶</span> smooth min-jerk curve <span class="k">(NaturalMouseMotion / GAN)</span></button>
-    <button class="btn" id="btnLinear"><span class="k">▶</span> constant-velocity line <span class="k">(pyautogui moveTo)</span></button>
-    <button class="btn" id="btnStep"><span class="k">▶</span> teleport-and-settle <span class="k">(Selenium Actions)</span></button>
-    <button class="btn" id="btnEvasive"><span class="k">▶</span> feature-matched evasive <span class="k">(shuffled speeds)</span></button>
+    <h2 style="margin-top:22px">Simulate a bot</h2>
+    <button class="btn" id="btnBezier"><span class="k">▶</span> smooth min-jerk curve <span class="k">· NaturalMouseMotion</span></button>
+    <button class="btn" id="btnLinear"><span class="k">▶</span> constant-velocity line <span class="k">· pyautogui</span></button>
+    <button class="btn" id="btnStep"><span class="k">▶</span> teleport-and-settle <span class="k">· Selenium</span></button>
+    <button class="btn" id="btnEvasive"><span class="k">▶</span> feature-matched evasive <span class="k">· shuffled speeds</span></button>
     <p class="catch" id="catch">bots caught at this threshold: <b id="catchN">0 / 0</b></p>
   </div>
 
-  <div class="log">
+  <div class="log glass">
     <h2>Recent verdicts</h2>
     <div class="rows" id="rows"></div>
   </div>
 
-  <p class="disclaimer">
+  <p class="disclaimer glass">
     <b>READ BEFORE DEMOING.</b>
     The model was trained where <em>human</em> = Balabit 40–80&nbsp;min admin-work
     sessions and <em>bot</em> = synthetic twins of those. This demo page is a
     <em>third</em> domain it has never seen, and absolute-velocity features depend
-    on your screen, mouse and DPI — so treat the raw <b style="color:var(--accent)">P(bot) score</b>
-    and the gauge as the signal, not the hard label. The <b style="color:var(--warn)">0.87
-    decision line</b> is the Tier&nbsp;5 operating point for a 1% false-positive
-    budget on held-out users; at that setting the model catches ~58% of evasive
-    bots, so several of the sim buttons score high (0.5–0.85) yet sit under the
-    line. Drag the threshold down to see the recall/false-positive trade-off — that
-    is the finding, not a bug. Held-out-user reference at 0.87: 0.9% human FPR,
-    99.4% naive-bot recall, 58.3% evasive-bot recall (naive AUC 0.9995, evasive
-    AUC 0.9649). Gaps 4–5 from the plan — recalibration for a new context, real
-    captured-bot validation — are out of scope here and stay stated as limitations.
+    on your screen, mouse and DPI — so treat the raw P(bot) score and the gauge as
+    the signal, not the hard label. The 0.87 decision line is the Tier&nbsp;5
+    operating point for a 1% false-positive budget on held-out users; at that
+    setting the model catches ~58% of evasive bots, so several sim buttons score
+    high (0.5–0.85) yet sit under the line. Drag the threshold to see the
+    recall / false-positive trade-off — that is the finding, not a bug. Held-out
+    reference at 0.87: 0.9% human FPR, 99.4% naive-bot recall, 58.3% evasive-bot
+    recall (naive AUC 0.9995, evasive AUC 0.9649). Gaps 4–5 — recalibration for a
+    new context, real captured-bot validation — are out of scope here and stay
+    stated as limitations.
   </p>
 </div>
 

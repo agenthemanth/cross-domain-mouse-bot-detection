@@ -137,8 +137,48 @@
     <span>DELBOT 3,453 sessions → Balabit 24,182 gap-chunks</span>
     <span>Weka 3.8.6 RandomForest · 100 trees · seed 1</span>
     <span>post-rescale re-baseline · 2026-08-30</span>
+    <span>baseline + demo sections added · 2026-08-31</span>
   </div>
 </header>
+
+<section class="tier">
+  <div class="tier-head"><span class="tno">Base</span><h2>Baseline &amp; corrections</h2></div>
+  <p class="q">Before any of this — how good did the same-domain detector look, and why were the first numbers wrong?</p>
+  <p class="setup">DELBOT-trained <span class="m">RandomForest</span> (100 trees, 7 features) is
+    the pipeline's final classifier; <span class="m">J48</span> is kept only as an interpretable
+    baseline. Tested one-sided — false-positive rate only — on two independent all-human sets:
+    mightymerge.io browsing (45,465 sessions, 5,748 people) and Balabit admin sessions
+    (24,182 gap-chunks).</p>
+  <div class="tablewrap"><table>
+    <caption>DELBOT-trained · all-human test sets · false positives only</caption>
+    <thead><tr><th>metric</th><th>first reported</th><th>corrected (post-rescale)</th></tr></thead>
+    <tbody>
+      <tr><td>mightymerge micro-avg FPR</td><td>0.71% RF / 2.18% J48</td><td class="bad">5.28%</td></tr>
+      <tr><td>mightymerge macro-avg FPR (per person)</td><td>—</td><td>3.92%</td></tr>
+      <tr><td>Balabit human FPR @0.5</td><td>1.07% RF / 16.69% J48</td><td class="bad">9.79%</td></tr>
+    </tbody>
+  </table></div>
+  <p>Two feature bugs invalidated every early headline number, and finding them is the
+    methodological spine of the study:</p>
+  <div class="note"><strong>Bug 1 — dt-clamp:</strong> velocities were computed with Δt
+    clamped to <span class="m">1e-3 ms</span>. Balabit has ~16.5% tied timestamps, so those
+    steps had velocity / acceleration / jerk inflated ~10<sup>6</sup>×. Fixed in the feature
+    extractor and in <span class="m">FalsePositiveEvaluator</span>.<br><br>
+    <strong>Bug 2 — normalised coords:</strong> 9 <span class="m">circles_human_fast</span>
+    DELBOT files stored coordinates as screen fractions, not pixels — read as pixels their
+    velocities were ~1087× too small.<br><br>
+    <strong>Why J48 stays:</strong> an earlier interpretable-baseline run caught a
+    data-leakage bug that the Random Forest had hidden.</p>
+  <p>The mightymerge set has no raw x/y, so 3 of its 7 features are computed differently than
+    in DELBOT training — it is a sanity check, not the project's cross-dataset result. Balabit
+    is the sound cross-domain false-positive number. No cited paper runs the exact experiment
+    (hand-crafted RF trained on one mouse dataset, bot detection tested on another); even for
+    the easier within-dataset Balabit <em>authentication</em> task a hand-crafted-feature RF
+    reaches only AUC ~0.72 / EER ~33% against ~0.98 for deep sequence models. Several
+    supporting citations (Iliou et al. ×2, Wei et al.) remain unverified against the source
+    papers and are flagged as such in the manuscript notes.</p>
+  <span class="verdict v-warn">Early headline numbers were artefacts — corrected FPR ~5–10%</span>
+</section>
 
 <section class="tier">
   <div class="tier-head"><span class="tno">Tier 1</span><h2>Zero-shot transfer</h2></div>
@@ -331,6 +371,41 @@
   <span class="verdict v-warn">Defences are attack-specific — the race continues</span>
 </section>
 
+<section class="tier">
+  <div class="tier-head"><span class="tno">Demo</span><h2>Live demo front end</h2></div>
+  <p class="q">Can the frozen model score a real cursor in a browser?</p>
+  <p class="setup"><span class="m">DemoModelTrainer</span> freezes the Tier-4
+    <span class="m">AUGMENTED AUG_NAIVE_PLUS</span> model (18 features; DELBOT + one naive
+    <span class="m">BalabitBotSynthesizer</span> twin + one <span class="m">SHUFFLE</span>
+    evasive twin per training-user chunk; 5 Balabit users held out) to
+    <span class="m">demo/model/</span>. <span class="m">features.js</span> is a hand port of
+    the Java feature pipeline; <span class="m">parity.js</span> recomputes 25 golden vectors
+    in Node and asserts a match. <span class="m">DemoServer</span>
+    (<span class="m">com.sun.net.httpserver</span>, <span class="m">POST /score</span>) serves
+    a capture arena with a live P(bot) gauge and a movable decision line.</p>
+  <div class="tablewrap"><table>
+    <caption>Frozen AUGMENTED-18 model · threshold 0.87 (fresh over all 5 held-out users)</caption>
+    <thead><tr><th>check</th><th>result</th></tr></thead>
+    <tbody>
+      <tr><td>Java ↔ JS feature parity</td><td class="good">PASS · worst rel err 7e-12</td></tr>
+      <tr><td>frozen model · naive AUC / evasive AUC</td><td>0.9995 / 0.9649</td></tr>
+      <tr><td>threshold 0.87 · human FPR / naive recall / evasive recall</td><td>0.9% / 99.4% / 58.3%</td></tr>
+      <tr><td>bezier (min-jerk) bot @0.87</td><td class="good">~0.89–0.91 — caught</td></tr>
+      <tr><td>linear / step / evasive bot @0.87</td><td>~0.75 / ~0.54 / ~0.54 — under the line</td></tr>
+    </tbody>
+  </table></div>
+  <p>The demo page is a third domain the model never saw, and its absolute-velocity features
+    depend on the viewer's screen and pointer — the Tier-1 zero-shot finding, recurring live.
+    The <span class="m">step</span> and <span class="m">evasive</span> bots sitting under the
+    strict line is the Tier-5 operating-point trade-off surfaced through the threshold slider,
+    not a demo bug. All non-visual checks pass (parity, endpoint labels, static serve, bot
+    scorability); not yet verified end-to-end in a real browser.</p>
+  <div class="note"><strong>Artefact:</strong> <span class="m">demo/model/rf.model</span> is an
+    18 MB binary now in git history. Regenerable from <span class="m">DemoModelTrainer</span>;
+    could be gitignored.</div>
+  <span class="verdict v-warn">Working — pending real-browser verification</span>
+</section>
+
 <section class="closing">
   <h2>The race, in seven moves</h2>
   <ol class="race">
@@ -369,8 +444,9 @@
   </dl>
 
   <p class="foot">DELBOT + Balabit · Java 17 / Weka 3.8.6 · deterministic (RF seed 1,
-    sorted file order, per-chunk-seeded synthesis) · numbers regenerated on the
-    post-rescale training set, 2026-08-30. Reference tools:
+    sorted file order, per-chunk-seeded synthesis) · tier numbers regenerated on the
+    post-rescale training set, 2026-08-30 · baseline &amp; demo sections added 2026-08-31.
+    Reference tools:
     <span class="m">BalabitCrossDomainEval</span>, <span class="m">Tier4AdversarialEval</span>,
     <span class="m">Tier5OperatingPointEval</span>, <span class="m">Tier6FeatureProbe</span>,
     <span class="m">Tier7ArmsRaceEval</span>.</p>

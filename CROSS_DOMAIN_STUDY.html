@@ -1,0 +1,379 @@
+<title>Mouse-Dynamics Arms Race</title>
+<meta name="description" content="Seven tiers of cross-domain bot-detection experiments: what transfers, what doesn't, and where the arms race stands.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+  :root {
+    --bg:#F3F5F2; --surface:#FFFFFF; --surface-2:#ECEFEA;
+    --ink:#1A1E1B; --ink-soft:#565E57; --ink-faint:#838C84;
+    --line:#DBE0DA; --line-strong:#C3CABF;
+    --accent:#2F6D53; --accent-soft:#E4EFE9;
+    --pass:#2E7D48; --pass-soft:#E3F0E6;
+    --warn:#8A6410; --warn-soft:#F4EBD8;
+    --fail:#A6392E; --fail-soft:#F5E2DF;
+    --null:#5B6470; --null-soft:#E9EBEE;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --serif:'IBM Plex Serif',Georgia,'Times New Roman',serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0D100E; --surface:#151916; --surface-2:#1C211D;
+      --ink:#E2E6E2; --ink-soft:#A6AEA7; --ink-faint:#727A73;
+      --line:#252B27; --line-strong:#3A423C;
+      --accent:#5FB48D; --accent-soft:#16271F;
+      --pass:#63BE83; --pass-soft:#15271C;
+      --warn:#D6A85C; --warn-soft:#2A2213;
+      --fail:#E4796C; --fail-soft:#2C1613;
+      --null:#8A93A0; --null-soft:#1E2228;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0D100E; --surface:#151916; --surface-2:#1C211D;
+    --ink:#E2E6E2; --ink-soft:#A6AEA7; --ink-faint:#727A73;
+    --line:#252B27; --line-strong:#3A423C;
+    --accent:#5FB48D; --accent-soft:#16271F;
+    --pass:#63BE83; --pass-soft:#15271C;
+    --warn:#D6A85C; --warn-soft:#2A2213;
+    --fail:#E4796C; --fail-soft:#2C1613;
+    --null:#8A93A0; --null-soft:#1E2228;
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--serif);
+    line-height:1.6;margin:0;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px 120px}
+
+  header.top{padding:72px 0 40px;border-bottom:1px solid var(--line-strong)}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+  h1{font-family:var(--mono);font-weight:600;font-size:clamp(30px,5vw,46px);
+    line-height:1.08;letter-spacing:-.01em;margin:0 0 22px;text-wrap:balance}
+  .lede{font-size:19px;color:var(--ink-soft);max-width:62ch;margin:0}
+  .meta{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);
+    margin-top:26px;display:flex;flex-wrap:wrap;gap:8px 22px}
+
+  h2{font-family:var(--mono);font-weight:600;font-size:15px;letter-spacing:.03em;
+    text-transform:uppercase;color:var(--ink);margin:0 0 4px}
+  h3{font-family:var(--mono);font-weight:600;font-size:17px;margin:0 0 10px;
+    letter-spacing:-.005em;text-wrap:balance}
+  p{margin:0 0 16px;max-width:66ch}
+  a{color:var(--accent)}
+  code,.m{font-family:var(--mono);font-size:.88em;
+    background:var(--surface-2);padding:.08em .38em;border-radius:3px}
+
+  section.tier{padding:44px 0;border-bottom:1px solid var(--line)}
+  .tier-head{display:flex;gap:20px;align-items:baseline;margin-bottom:6px}
+  .tno{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--accent);
+    border:1px solid var(--accent);border-radius:4px;padding:3px 8px;flex:none;
+    line-height:1}
+  .q{font-family:var(--serif);font-style:italic;font-size:20px;color:var(--ink);
+    margin:0 0 14px;max-width:60ch;text-wrap:balance}
+  .setup{font-size:15px;color:var(--ink-soft);border-left:2px solid var(--line-strong);
+    padding-left:14px;margin:0 0 20px;max-width:64ch}
+
+  .tablewrap{overflow-x:auto;margin:18px 0;border:1px solid var(--line);
+    border-radius:8px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:13px;
+    font-variant-numeric:tabular-nums}
+  caption{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--ink-faint);text-align:left;
+    padding:12px 16px 0}
+  th,td{padding:9px 14px;text-align:right;white-space:nowrap;
+    border-bottom:1px solid var(--line)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{font-weight:600;color:var(--ink-soft);border-bottom:1px solid var(--line-strong);
+    position:sticky;top:0;background:var(--surface)}
+  tbody tr:last-child td{border-bottom:none}
+  tr.hi td{background:var(--accent-soft)}
+  td.good{color:var(--pass);font-weight:500}
+  td.bad{color:var(--fail);font-weight:500}
+
+  .verdict{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);
+    font-size:12.5px;font-weight:500;padding:6px 12px;border-radius:5px;margin-top:6px}
+  .verdict::before{content:"";width:7px;height:7px;border-radius:50%}
+  .v-fail{background:var(--fail-soft);color:var(--fail)}
+  .v-fail::before{background:var(--fail)}
+  .v-pass{background:var(--pass-soft);color:var(--pass)}
+  .v-pass::before{background:var(--pass)}
+  .v-warn{background:var(--warn-soft);color:var(--warn)}
+  .v-warn::before{background:var(--warn)}
+  .v-null{background:var(--null-soft);color:var(--null)}
+  .v-null::before{background:var(--null)}
+
+  .note{font-size:14.5px;color:var(--ink-soft);background:var(--surface-2);
+    border-radius:8px;padding:16px 18px;margin:18px 0;max-width:68ch}
+  .note strong{color:var(--ink);font-family:var(--mono);font-size:.9em}
+
+  section.closing{padding:52px 0 0}
+  ol.race{counter-reset:r;list-style:none;padding:0;margin:22px 0;max-width:70ch}
+  ol.race li{counter-increment:r;position:relative;padding:12px 0 12px 44px;
+    border-bottom:1px solid var(--line);font-size:15.5px}
+  ol.race li::before{content:counter(r);position:absolute;left:0;top:12px;
+    font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);
+    border:1px solid var(--line-strong);border-radius:4px;width:24px;height:24px;
+    display:flex;align-items:center;justify-content:center}
+
+  dl.caveats{margin:16px 0;max-width:70ch}
+  dl.caveats dt{font-family:var(--mono);font-size:13px;font-weight:600;
+    color:var(--ink);margin-top:16px}
+  dl.caveats dd{margin:4px 0 0;font-size:14.5px;color:var(--ink-soft)}
+
+  .foot{font-family:var(--mono);font-size:12px;color:var(--ink-faint);
+    margin-top:56px;padding-top:20px;border-top:1px solid var(--line)}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="kicker">Cross-domain behavioural bot detection · measurement record</p>
+  <h1>Mouse-Dynamics Arms Race</h1>
+  <p class="lede">A hand-crafted-feature Random Forest trained on 3-second circle-drawing
+    tasks, tested on 40–80-minute admin-work sessions and against synthetic bots that
+    get progressively harder to tell from people. Seven tiers of what transfers, what
+    doesn't, and where the race stands.</p>
+  <div class="meta">
+    <span>DELBOT 3,453 sessions → Balabit 24,182 gap-chunks</span>
+    <span>Weka 3.8.6 RandomForest · 100 trees · seed 1</span>
+    <span>post-rescale re-baseline · 2026-08-30</span>
+  </div>
+</header>
+
+<section class="tier">
+  <div class="tier-head"><span class="tno">Tier 1</span><h2>Zero-shot transfer</h2></div>
+  <p class="q">Does a detector trained on one dataset work on a completely different one, untouched?</p>
+  <p class="setup">7 features (<span class="m">num_points, duration_ms, mean/std_velocity,
+    mean_acceleration, mean_jerk, path_efficiency</span>). Train on all of DELBOT,
+    score every real Balabit human gap-chunk, and score matched synthetic-bot twins
+    built from each chunk (endpoints, point count, duration preserved).</p>
+  <div class="tablewrap"><table>
+    <caption>DELBOT-trained, evaluated on Balabit — no adaptation</caption>
+    <thead><tr><th>metric</th><th>pre-rescale</th><th>post-rescale</th></tr></thead>
+    <tbody>
+      <tr><td>Balabit human false-positive rate @0.5</td><td>9.85%</td><td>9.79%</td></tr>
+      <tr><td>mightymerge micro-avg FPR</td><td>5.45%</td><td>5.28%</td></tr>
+      <tr><td>pooled synthetic-bot ROC-AUC</td><td>0.5326</td><td class="bad">0.4417</td></tr>
+      <tr><td>bot recall @ ≤1% human FPR</td><td>0.00%</td><td class="bad">0.00%</td></tr>
+    </tbody>
+  </table></div>
+  <p>The forest learned "fast, jerky motion = bot" from DELBOT's pynput / GAN tools.
+    In the Balabit admin-work domain that same signature belongs to the <em>humans</em>,
+    so the pooled bot AUC sits at or below chance and no operating point catches bots
+    without locking real users out.</p>
+  <div class="note"><strong>Re-baseline:</strong> 9 DELBOT files
+    (<span class="m">circles_human_fast</span>) stored coordinates as screen fractions,
+    not pixels — read as pixels their velocities were ~1087× too small. Fixing it moved
+    every DELBOT-trained number slightly; measured by <span class="m">git stash</span>
+    toggling on the frozen reference tools. No conclusion changed.</p>
+  <span class="verdict v-fail">No cross-domain transfer</span>
+</section>
+
+<section class="tier">
+  <div class="tier-head"><span class="tno">Tier 2</span><h2>Training augmentation</h2></div>
+  <p class="q">If the training set has no in-domain bots, can synthetic ones stand in?</p>
+  <p class="setup">Held-out Balabit user split (5 train / 5 test, no overlap). Add one
+    synthetic-bot twin per training-user human chunk to the DELBOT training set.
+    <span class="m">BASELINE</span> = 7 features; <span class="m">SCALEFREE</span> = 14
+    dimensionless features (drops absolute velocity / accel / jerk).</p>
+  <div class="tablewrap"><table>
+    <caption>Held-out users · pooled synthetic-bot AUC · burst-timed test bots</caption>
+    <thead><tr><th>features</th><th>training</th><th>human FPR</th><th>bot AUC</th><th>recall @≤1% FPR</th></tr></thead>
+    <tbody>
+      <tr><td>BASELINE 7</td><td>DELBOT only</td><td>10.85%</td><td class="bad">0.36–0.43</td><td>0.01%</td></tr>
+      <tr class="hi"><td>BASELINE 7</td><td>+ synthetic twins</td><td class="good">0.97%</td><td class="good">0.997–0.9997</td><td class="good">92–99%</td></tr>
+      <tr><td>SCALEFREE 14</td><td>+ synthetic twins</td><td class="good">0.39%</td><td class="good">0.999</td><td class="good">99.9%</td></tr>
+      <tr><td>BASELINE 7</td><td>+ twins, unseen bot types held out</td><td>0.56%</td><td>0.979–0.998</td><td>90–98%</td></tr>
+    </tbody>
+  </table></div>
+  <p>The gain generalises to bot movement models not present in training, so it is not
+    pure generator memorisation. This is semi-supervised domain adaptation, not zero-shot —
+    five Balabit users are in the training set, which is part of why human FPR drops so far.</p>
+  <span class="verdict v-pass">Fixes naive-bot transfer</span>
+</section>
+
+<section class="tier">
+  <div class="tier-head"><span class="tno">Tier 3</span><h2>Re-segmentation</h2></div>
+  <p class="q">Gap-split chunks are long, multi-action windows. Do per-action units transfer better?</p>
+  <p class="setup">Segment Balabit into mouse-move / point-click / drag-drop actions
+    (median 1.6 s / 11 pts vs 13.6 s / 66 pts for gap-chunks). Same held-out split,
+    same two training sets.</p>
+  <div class="tablewrap"><table>
+    <caption>Action-level units · held-out users</caption>
+    <thead><tr><th>features</th><th>training</th><th>human FPR</th><th>bot AUC (matched / burst)</th></tr></thead>
+    <tbody>
+      <tr><td>BASELINE 7</td><td>DELBOT only</td><td class="bad">28.85%</td><td>0.42 / 0.45</td></tr>
+      <tr><td>SCALEFREE 14</td><td>DELBOT only</td><td class="bad">71.09%</td><td>0.37 / 0.36</td></tr>
+      <tr><td>BASELINE 7</td><td>+ synthetic twins</td><td>2.03%</td><td>0.93 / 0.998</td></tr>
+    </tbody>
+  </table></div>
+  <p>Shorter 11-point actions sit even further outside DELBOT's ~150-point circle-drawing
+    distribution, so zero-shot gets worse, and augmented action-level detection is no
+    better than the gap-chunk level and worse for the hard matched-timing bots. More
+    points make more stable aggregates.</p>
+  <span class="verdict v-null">Negative result — does not help</span>
+</section>
+
+<section class="tier">
+  <div class="tier-head"><span class="tno">Tier 4</span><h2>The evasive bot</h2></div>
+  <p class="q">The synthetic bots so far are naive. What about one built to match the feature vector?</p>
+  <p class="setup"><span class="m">AdversarialBotSynthesizer</span> reuses the victim
+    chunk's own (step-distance, Δt) pairs in <em>shuffled</em> order, so the per-step
+    speed multiset — and every permutation-invariant feature — matches by construction.
+    Path = straight line + sine deviations, amplitude tuned so path length matches.
+    <span class="m">AUG_NAIVE</span> = the Tier-2 setup; <span class="m">AUG_NAIVE_PLUS</span>
+    also puts evasive twins in training.</p>
+  <div class="tablewrap"><table>
+    <caption>Held-out users · evasive bot · post-rescale</caption>
+    <thead><tr><th>features</th><th>training</th><th>human FPR</th><th>naive AUC</th><th>evasive AUC</th><th>evasive recall @≤1%</th></tr></thead>
+    <tbody>
+      <tr><td>AUGMENTED 18</td><td>AUG_NAIVE (Tier-2 winner)</td><td class="good">0.36%</td><td>1.00</td><td class="bad">0.526</td><td class="bad">0.6%</td></tr>
+      <tr><td>BASELINE 7</td><td>AUG_NAIVE_PLUS</td><td class="bad">30.93%</td><td>0.997</td><td>0.800</td><td>7.4%</td></tr>
+      <tr><td>AUGMENTED 18</td><td>AUG_NAIVE_PLUS</td><td>12.30%</td><td>0.9995</td><td>0.9649</td><td>58.3%</td></tr>
+      <tr class="hi"><td>AUGMENTED_SEQ 20</td><td>AUG_NAIVE_PLUS</td><td>11.86%</td><td>0.9996</td><td class="good">0.9662</td><td class="good">59.6%</td></tr>
+    </tbody>
+  </table></div>
+  <p>The Tier-2 winner is a coin flip against the evasive bot — it had learned the naive
+    bots' crude tells (velocity scale, over-smooth path), which this bot matches. Putting
+    evasive twins in training recovers detection, but <em>only</em> with the rich feature
+    set: 7 features flag 31% of humans to get there.</p>
+  <span class="verdict v-warn">Recoverable — rich features required, at an FPR cost</span>
+</section>
+
+<section class="tier">
+  <div class="tier-head"><span class="tno">Tier 5</span><h2>Operating point</h2></div>
+  <p class="q">Is that 12% human false-positive rate a real defect, or the wrong threshold?</p>
+  <p class="setup">Three-way user split: threshold chosen on <span class="m">CALIB</span>
+    users, every rate measured on <em>disjoint</em> <span class="m">REPORT</span> users.
+    Model = <span class="m">AUGMENTED_SEQ</span>, trained on DELBOT + naive + evasive twins.</p>
+  <div class="tablewrap"><table>
+    <caption>Threshold set on held-out CALIB users · rates on disjoint REPORT users</caption>
+    <thead><tr><th>target human FPR</th><th>achieved (report)</th><th>naive recall</th><th>evasive recall</th></tr></thead>
+    <tbody>
+      <tr><td>default 0.5 threshold</td><td class="bad">13.2%</td><td>99.9%</td><td>91.7%*</td></tr>
+      <tr><td>≤ 1.0%</td><td>1.95%</td><td>99.6%</td><td>67.0%</td></tr>
+      <tr class="hi"><td>≤ 2.0%</td><td>3.36%</td><td>99.7%</td><td class="good">74.3%</td></tr>
+      <tr><td>≤ 3.0%</td><td>4.83%</td><td>99.8%</td><td>79.3%</td></tr>
+    </tbody>
+  </table></div>
+  <p style="font-size:14px;color:var(--ink-faint)">* recall at the default cut, before the operating point is chosen.</p>
+  <p>Cost-sensitive training and class rebalancing bought nothing (AUC 0.962 / 0.956 vs
+    0.962 plain). Platt / isotonic calibration cannot help either — they are monotone
+    rescorings and cannot move a point on the ROC curve. A ±10% reject band is a genuine
+    free win: coverage 94%, kept human FPR 0.5%, evasive recall 69%.</p>
+  <div class="note"><strong>New deployment finding:</strong> the operating point does
+    not transfer cleanly across users. A threshold set for 1% FPR on calibration users
+    lands at ~1.9% on report users; target 3% → ~5%. Consistent ~1.6–2× slippage —
+    calibrate at roughly half the FPR you actually need.</div>
+  <span class="verdict v-warn">Threshold artefact — but the operating point slips across users</span>
+</section>
+
+<section class="tier">
+  <div class="tier-head"><span class="tno">Tier 6</span><h2>Ordering features</h2></div>
+  <p class="q">The evasive bot shuffles the speed sequence. Can a feature read the order the other 20 throw away?</p>
+  <p class="setup">Two dimensionless features:
+    <span class="m">velocity_lag1_autocorr</span> (lag-1 autocorrelation of the per-step
+    speed series) and <span class="m">velocity_step_roughness</span> (mean |Δspeed| /
+    mean speed), over moving steps. <span class="m">Tier6FeatureProbe</span> checks
+    whether the signal exists before trusting the downstream number.</p>
+  <div class="tablewrap"><table>
+    <caption>Mean feature value · held-out test chunks</caption>
+    <thead><tr><th>group</th><th>lag1 autocorr</th><th>step roughness</th><th>single-feature AUC vs evasive</th></tr></thead>
+    <tbody>
+      <tr><td>human</td><td>0.049</td><td>1.537</td><td>—</td></tr>
+      <tr><td>evasive (shuffle) bot</td><td>0.000</td><td>1.663</td><td>0.45 / 0.57</td></tr>
+    </tbody>
+  </table></div>
+  <p>Human gap-chunk step-speed is essentially <em>i.i.d.</em> — the autocorrelation the
+    hypothesis assumed is not there (median −0.014, indistinguishable from the shuffled
+    bot). Downstream the 2 features add <span class="m">+0.0013</span> evasive AUC — real
+    (the RF-seed spread is 0.0003) but negligible, and it comes almost entirely from
+    <span class="m">step_roughness</span>. Hand-crafted scalar features on gap-chunk
+    aggregates are exhausted for this adversary.</p>
+  <span class="verdict v-null">Marginal — hypothesised mechanism absent</span>
+</section>
+
+<section class="tier">
+  <div class="tier-head"><span class="tno">Tier 7</span><h2>Round-7 attacker</h2></div>
+  <p class="q">What if the bot also matches the ordering — a smooth speed ramp instead of a shuffle?</p>
+  <p class="setup"><span class="m">Ordering.BALLISTIC</span> sorts the same reused
+    (distance, Δt) pairs onto a single rise-then-fall speed envelope. Multiset, endpoints,
+    count, duration, path length still matched. Trained and tested against both the
+    <span class="m">SHUFFLE</span> and <span class="m">BALLISTIC</span> evasive bots.</p>
+  <div class="tablewrap"><table>
+    <caption>Mean ordering-feature value · held-out test chunks</caption>
+    <thead><tr><th>group</th><th>lag1 autocorr</th><th>step roughness</th></tr></thead>
+    <tbody>
+      <tr><td>human</td><td>0.049</td><td>1.537</td></tr>
+      <tr><td>SHUFFLE bot</td><td>0.000 <span style="color:var(--ink-faint)">(too random)</span></td><td>1.663</td></tr>
+      <tr><td>BALLISTIC bot</td><td>0.446 <span style="color:var(--ink-faint)">(too smooth)</span></td><td>1.047</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tablewrap"><table>
+    <caption>Evasive ROC-AUC by feature set and training set · held-out users</caption>
+    <thead><tr><th>features</th><th>training set</th><th>human FPR</th><th>vs SHUFFLE</th><th>vs BALLISTIC</th></tr></thead>
+    <tbody>
+      <tr><td>AUGMENTED 18</td><td>+ SHUFFLE twins (Tier 4/5 model)</td><td>12.30%</td><td class="good">0.9649</td><td class="bad">0.8636</td></tr>
+      <tr><td>AUGMENTED_SEQ 20</td><td>+ SHUFFLE twins</td><td>11.86%</td><td class="good">0.9662</td><td class="bad">0.8596</td></tr>
+      <tr><td>AUGMENTED 18</td><td>+ BALLISTIC twins only</td><td>0.77%</td><td class="bad">0.7202</td><td class="good">0.9998</td></tr>
+      <tr class="hi"><td>AUGMENTED 18</td><td>+ both</td><td>14.44%</td><td class="good">0.9616</td><td class="good">0.9990</td></tr>
+      <tr class="hi"><td>AUGMENTED_SEQ 20</td><td>+ both</td><td>13.67%</td><td class="good">0.9633</td><td class="good">0.9989</td></tr>
+    </tbody>
+  </table></div>
+  <p>The ballistic bot doesn't <em>match</em> the ordering statistics — it overshoots,
+    swapping "too random" for "too smooth". Real gap-chunk motion lives in a narrow band
+    between. It still degrades the Tier-4/5 model (evasive AUC 0.96 → 0.86, recall
+    58% → 16%), and the Tier-6 ordering features give <em>no</em> protection against it —
+    they had learned "jerkier than a human = bot" from the shuffle bot, and the ballistic
+    bot is smoother than a human. A model trained only on ballistic twins is barely better
+    than a coin flip against shuffle (0.72). Training on both covers both, at the same
+    tunable default-threshold FPR cost seen in Tier 4.</p>
+  <span class="verdict v-warn">Defences are attack-specific — the race continues</span>
+</section>
+
+<section class="closing">
+  <h2>The race, in seven moves</h2>
+  <ol class="race">
+    <li>A hand-crafted-feature Random Forest does not transfer across datasets (bot AUC 0.44).</li>
+    <li>Better features don't fix it — richer features make zero-shot <em>worse</em>.</li>
+    <li>Re-segmentation doesn't fix it either.</li>
+    <li>Synthetic-bot training augmentation fixes it for naive bots (AUC 0.998).</li>
+    <li>A feature-matched evasive bot defeats that (AUC 0.53); adversarial training + rich
+      features recovers it (AUC 0.965), and the human-FPR cost is a threshold artefact —
+      ~74% evasive recall at ~3.4% held-out-user FPR.</li>
+    <li>Reading the shuffled step order back out is a marginal add — the temporal signal
+      the idea assumed isn't present in these chunks.</li>
+    <li>A second evasion strategy defeats the Tier-5 model (AUC 0.86) and is only covered
+      by training on it too. Defences don't generalise across evasions for free.</li>
+  </ol>
+  <p>Behavioural bot detection with hand-crafted features and trees is a measurable arms
+    race, not a solved problem. The next real lever is a different representation —
+    a trajectory-image CNN, as in Wei et al. — not more scalar features.</p>
+
+  <h2 style="margin-top:44px">Method caveats — state these in the writeup</h2>
+  <dl class="caveats">
+    <dt>Not zero-shot from Tier 2 on</dt>
+    <dd>The augmented models train on five Balabit users. This is semi-supervised domain
+      adaptation; the human-FPR drop partly reflects having in-domain human examples.</dd>
+    <dt>Synthetic bots share one generator family</dt>
+    <dd>All test bots come from <span class="m">BalabitBotSynthesizer</span> /
+      <span class="m">AdversarialBotSynthesizer</span> (Bezier, min-jerk, shuffle, ballistic).
+      No captured Selenium / pyautogui traffic, no GAN trajectories.</dd>
+    <dt>The arms race is not won</dt>
+    <dd>The evasive bots match a subset of features by construction; a bot that also
+      matched accel/jerk ordering and curvature — or hit the human roughness band exactly
+      — would push detection back toward chance.</dd>
+    <dt>Latency is asserted, not measured</dt>
+    <dd>The sub-millisecond real-time claim has not been timed for the 100-tree forest
+      plus 20-feature extraction.</dd>
+  </dl>
+
+  <p class="foot">DELBOT + Balabit · Java 17 / Weka 3.8.6 · deterministic (RF seed 1,
+    sorted file order, per-chunk-seeded synthesis) · numbers regenerated on the
+    post-rescale training set, 2026-08-30. Reference tools:
+    <span class="m">BalabitCrossDomainEval</span>, <span class="m">Tier4AdversarialEval</span>,
+    <span class="m">Tier5OperatingPointEval</span>, <span class="m">Tier6FeatureProbe</span>,
+    <span class="m">Tier7ArmsRaceEval</span>.</p>
+</section>
+
+</div>

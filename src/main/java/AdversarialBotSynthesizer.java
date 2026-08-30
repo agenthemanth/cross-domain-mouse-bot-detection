@@ -3,7 +3,7 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * TIER 4 -- an EVASIVE / feature-matched synthetic bot.
+ * TIER 4 &amp; 7 -- an EVASIVE / feature-matched synthetic bot.
  *
  * The Tier-2 win (synthetic-bot training augmentation, cross-domain bot AUC
  * 0.53 -> 0.998) came with a stated caveat: the {@link BalabitBotSynthesizer}
@@ -23,24 +23,42 @@ import java.util.Random;
  *   - endpoints, point count and total duration stay matched (as with every
  *     synthesiser here) so those cannot leak the label.
  *
- * What it does NOT reproduce is the sequential correlation structure of real
+ * What SHUFFLE does NOT reproduce is the sequential correlation structure of real
  * motion (a human accelerates smoothly; a shuffled speed sequence is
  * white-noise-like in its ordering) and whatever the sine-deviation path model
  * fails to capture. Whether an augmented RandomForest still separates these is
  * the Tier-4 question.  Deterministic given the supplied {@link Random}.
+ *
+ * TIER 7 -- {@link Ordering#BALLISTIC} closes that last gap. Instead of a random
+ * permutation of the (distance, dt) pairs it arranges them into a single
+ * rise-then-fall speed ramp (slow pairs at the ends, fast pairs in the middle),
+ * so the per-step speed series is now smoothly autocorrelated and its successive
+ * differences are small -- defeating the Tier-6 features velocity_lag1_autocorr
+ * and velocity_step_roughness while STILL matching the speed multiset, endpoints,
+ * count, duration and path length exactly. This is the Round-7 attacker: does the
+ * AUGMENTED_SEQ gain survive a bot that also matches the ordering statistics?
  */
 public final class AdversarialBotSynthesizer {
 
     private static final int DEVIATION_MODES = 7;
     private static final int LENGTH_FIT_ITERS = 30;
 
+    /** Step-ordering strategy. SHUFFLE = Tier 4 (random). BALLISTIC = Tier 7 (smooth ramp). */
+    public enum Ordering { SHUFFLE, BALLISTIC }
+
     private AdversarialBotSynthesizer() {}
+
+    /** Tier-4 entry point: random-shuffle ordering. */
+    public static List<double[]> synthesize(List<double[]> humanChunk, Random rng) {
+        return synthesize(humanChunk, Ordering.SHUFFLE, rng);
+    }
 
     /**
      * @param humanChunk source points (t_seconds, x, y), ascending in t
+     * @param ordering   how to order the reused (distance, dt) pairs
      * @return matched evasive bot as (t_seconds, x, y), or null if unusable
      */
-    public static List<double[]> synthesize(List<double[]> humanChunk, Random rng) {
+    public static List<double[]> synthesize(List<double[]> humanChunk, Ordering ordering, Random rng) {
         int n = humanChunk.size();
         if (n < 5) return null;
 
@@ -64,13 +82,8 @@ public final class AdversarialBotSynthesizer {
         }
         if (srcPathLen < 1e-6) return null;
 
-        // ---- shuffle (distance, dt) pairs together -> speed multiset preserved ----
-        int[] perm = new int[n - 1];
-        for (int i = 0; i < perm.length; i++) perm[i] = i;
-        for (int i = perm.length - 1; i > 0; i--) {
-            int j = rng.nextInt(i + 1);
-            int tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
-        }
+        // ---- reorder (distance, dt) pairs together -> speed multiset preserved ----
+        int[] perm = orderPairs(stepDist, stepDt, ordering, rng);
         double[] arcFrac = new double[n];
         double[] times = new double[n];
         double accDist = 0, accTime = 0;
@@ -132,6 +145,41 @@ public final class AdversarialBotSynthesizer {
         bot.get(0)[1] = x0; bot.get(0)[2] = y0;
         bot.get(n - 1)[1] = x1; bot.get(n - 1)[2] = y1;
         return bot;
+    }
+
+    /**
+     * Returns an ordering of the {@code n-1} step indices.
+     *  SHUFFLE   -- uniform random permutation (Fisher-Yates). Tier 4.
+     *  BALLISTIC -- sort steps by speed (dist/dt), then interleave so speed rises to a
+     *               single mid-sequence peak and falls back: the slowest step first, then
+     *               the next slowest LAST, next SECOND, ... i.e. odd ranks go on the rising
+     *               limb, even ranks fill the falling limb from the end. The resulting speed
+     *               series is monotone up then monotone down -> lag-1 autocorrelation near
+     *               +1 and mean|dv| minimised, matching a real point-to-point movement,
+     *               while the multiset of (dist, dt) pairs is unchanged. Tier 7.
+     */
+    private static int[] orderPairs(double[] stepDist, double[] stepDt, Ordering ordering, Random rng) {
+        int m = stepDist.length;
+        int[] perm = new int[m];
+        for (int i = 0; i < m; i++) perm[i] = i;
+        if (ordering == Ordering.SHUFFLE) {
+            for (int i = m - 1; i > 0; i--) {
+                int j = rng.nextInt(i + 1);
+                int t = perm[i]; perm[i] = perm[j]; perm[j] = t;
+            }
+            return perm;
+        }
+        // BALLISTIC: rank steps slow -> fast, then place onto a rise-then-fall envelope.
+        Integer[] bySpeed = new Integer[m];
+        for (int i = 0; i < m; i++) bySpeed[i] = i;
+        java.util.Arrays.sort(bySpeed, (a, b) -> Double.compare(
+                stepDist[a] / Math.max(stepDt[a], 1e-4), stepDist[b] / Math.max(stepDt[b], 1e-4)));
+        int lo = 0, hi = m - 1;
+        for (int rank = 0; rank < m; rank++) {
+            if (rank % 2 == 0) perm[lo++] = bySpeed[rank];   // rising limb, front
+            else               perm[hi--] = bySpeed[rank];   // falling limb, back
+        }
+        return perm;
     }
 
     /**

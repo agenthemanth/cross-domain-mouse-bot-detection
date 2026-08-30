@@ -51,3 +51,7 @@ click_fraud_dataset (1).csv
 delbot_features_engineered.csv
 click_fraud_phase2_engineered.csv
 feature_range_diag.txt
+
+### demo server logs
+demo/_srv.*
+demo/_server.*

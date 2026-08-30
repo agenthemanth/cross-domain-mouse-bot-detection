@@ -1,3 +1,0 @@
-demo model  : 19 attrs, threshold P(bot) >= 0.87
-serving      : http://127.0.0.1:8787/
-(Ctrl+C to stop)

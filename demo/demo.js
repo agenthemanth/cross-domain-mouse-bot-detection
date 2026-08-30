@@ -51,10 +51,14 @@
     var rect = arena.getBoundingClientRect();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!points || points.length < 2) return;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = colour;
+    ctx.shadowBlur = 8;
     for (var i = 1; i < points.length; i++) {
       var a = points[i - 1], b = points[i];
       ctx.strokeStyle = colour;
-      ctx.globalAlpha = Math.max(0.08, i / points.length);
+      ctx.globalAlpha = Math.max(0.06, i / points.length);
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(a[1] - rect.left, a[2] - rect.top);
@@ -63,10 +67,12 @@
     }
     ctx.globalAlpha = 1;
     var last = points[points.length - 1];
+    ctx.shadowBlur = 16;
     ctx.fillStyle = colour;
     ctx.beginPath();
-    ctx.arc(last[1] - rect.left, last[2] - rect.top, 3.5, 0, 7);
+    ctx.arc(last[1] - rect.left, last[2] - rect.top, 4, 0, 7);
     ctx.fill();
+    ctx.shadowBlur = 0;
   }
 
   // ---------- threshold slider ----------
@@ -100,7 +106,7 @@
     el.verdict.className = 'label ' + (label === 'BOT' ? 'bot' : 'human');
     el.prob.textContent = 'P(bot) = ' + score.toFixed(3) + '  ·  ' + source;
     el.fill.style.width = (score * 100).toFixed(1) + '%';
-    el.fill.style.background = label === 'BOT' ? 'var(--bot)' : 'var(--human)';
+    el.fill.classList.toggle('bot', label === 'BOT');
   }
   function setIdle(msg) {
     el.verdict.textContent = '—';

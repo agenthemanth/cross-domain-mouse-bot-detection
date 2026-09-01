@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sequential-Reveal CAPTCHA</title>
+<style>
+  :root{
+    --void:#070a12;
+    --orb-1:#6f5cff; --orb-2:#25e6c5; --orb-3:#ff5c8a; --orb-4:#4d84ff;
+    --glass:rgba(255,255,255,.055);
+    --glass-hi:rgba(255,255,255,.10);
+    --edge:rgba(255,255,255,.14);
+    --edge-lit:rgba(255,255,255,.42);
+    --shadow:0 24px 70px -24px rgba(0,0,0,.65);
+    --inner:inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(0,0,0,.18);
+    --ink:rgba(255,255,255,.95);
+    --ink-soft:rgba(255,255,255,.60);
+    --ink-faint:rgba(255,255,255,.38);
+    --human:#5fe9b6; --bot:#ff7d6c; --warn:#ffce6b;
+    --r-lg:26px; --r-md:15px; --r-sm:10px;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;
+    --mono:"SF Mono",ui-monospace,SFMono-Regular,Menlo,"Cascadia Mono",monospace;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{font-family:var(--sans);color:var(--ink);line-height:1.5;background:var(--void);
+    -webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+  .ambient{position:fixed;inset:-20vmax;z-index:-1;filter:blur(70px) saturate(150%);pointer-events:none}
+  .ambient span{position:absolute;border-radius:50%;opacity:.5;mix-blend-mode:screen}
+  .ambient .a{width:52vmax;height:52vmax;left:-8vmax;top:-10vmax;background:radial-gradient(circle at 30% 30%,var(--orb-1),transparent 62%);animation:drift1 34s ease-in-out infinite}
+  .ambient .b{width:46vmax;height:46vmax;right:-6vmax;top:6vmax;background:radial-gradient(circle at 60% 40%,var(--orb-2),transparent 60%);animation:drift2 40s ease-in-out infinite}
+  .ambient .c{width:44vmax;height:44vmax;left:18vmax;bottom:-14vmax;background:radial-gradient(circle at 50% 50%,var(--orb-3),transparent 60%);animation:drift3 46s ease-in-out infinite}
+  @keyframes drift1{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(6vmax,4vmax,0)}}
+  @keyframes drift2{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-5vmax,5vmax,0)}}
+  @keyframes drift3{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(4vmax,-6vmax,0)}}
+
+  .glass{position:relative;background:var(--glass);
+    -webkit-backdrop-filter:blur(30px) saturate(165%);backdrop-filter:blur(30px) saturate(165%);
+    border:1px solid var(--edge);border-radius:var(--r-lg);box-shadow:var(--shadow),var(--inner)}
+  .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(175deg,var(--edge-lit),transparent 34%);
+    -webkit-mask:linear-gradient(#000,transparent 46%);mask:linear-gradient(#000,transparent 46%);opacity:.7}
+
+  .wrap{max-width:1220px;margin:0 auto;padding:36px 26px 64px;
+    display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
+  header{grid-column:1/-1;padding:24px 30px;display:flex;flex-direction:column;gap:7px}
+  h1{font-size:23px;font-weight:600;letter-spacing:-.018em}
+  .sub{color:var(--ink-soft);font-size:13.5px;max-width:82ch;letter-spacing:-.005em}
+  .m{font-family:var(--mono);font-size:11.5px;color:var(--ink);
+    background:var(--glass-hi);padding:1px 6px;border-radius:6px;border:1px solid var(--edge)}
+  h2{font-size:12px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;
+    color:var(--ink-faint);margin-bottom:12px}
+
+  /* ---------- challenge card ---------- */
+  .card{padding:22px 24px 24px}
+  .bar{display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+  .promptbox{display:flex;align-items:center;gap:13px;padding:9px 15px 9px 11px;
+    border-radius:var(--r-md);background:var(--glass-hi);border:1px solid var(--edge)}
+  .promptbox img{width:52px;height:52px;display:block;border-radius:8px;
+    background:rgba(0,0,0,.28)}
+  .promptbox .lbl{font-size:12.5px;color:var(--ink-soft);max-width:19ch}
+  .pips{display:flex;gap:6px;margin-left:auto}
+  .pip{width:26px;height:5px;border-radius:99px;background:rgba(255,255,255,.13);transition:background .25s}
+  .pip.done{background:var(--human)}
+  .pip.now{background:var(--warn)}
+
+  .board{position:relative;width:760px;height:440px;max-width:100%;
+    border-radius:var(--r-md);overflow:hidden;
+    background:rgba(0,0,0,.26);border:1px solid var(--edge);
+    box-shadow:inset 0 2px 20px rgba(0,0,0,.5);cursor:crosshair}
+  .board canvas{position:absolute;inset:0;pointer-events:none}
+  .tile{position:absolute;border-radius:12px;border:1px solid rgba(255,255,255,.13);
+    background:rgba(255,255,255,.045);cursor:pointer;
+    transition:border-color .18s ease,background .18s ease,transform .12s ease}
+  .tile:hover{border-color:rgba(255,255,255,.38);background:rgba(255,255,255,.10);transform:translateY(-1px)}
+  .tile img{width:100%;height:100%;display:block;border-radius:11px;
+    -webkit-user-drag:none;user-select:none;pointer-events:none}
+  .tile.hit{border-color:var(--human);background:rgba(95,233,182,.15)}
+  .tile.miss{border-color:var(--bot);background:rgba(255,125,108,.18)}
+  .board.locked .tile{cursor:default;pointer-events:none;opacity:.55}
+
+  .veil{position:absolute;inset:0;display:none;place-items:center;text-align:center;
+    background:rgba(7,10,18,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    font-size:15px;font-weight:600;letter-spacing:-.01em;padding:24px}
+  .veil.on{display:grid}
+  .veil small{display:block;font-weight:400;font-size:12.5px;color:var(--ink-soft);
+    margin-top:7px;max-width:46ch;line-height:1.5}
+
+  .hintline{margin-top:13px;font-size:12.5px;color:var(--ink-faint)}
+
+  /* ---------- side panel ---------- */
+  .panel{padding:20px 22px 22px}
+  .panel + .panel{margin-top:18px}
+  .verdict{display:flex;align-items:baseline;gap:11px;margin-bottom:14px}
+  .badge{font-size:18px;font-weight:700;letter-spacing:-.02em;padding:3px 13px;border-radius:99px;
+    border:1px solid var(--edge);background:var(--glass-hi)}
+  .badge.pass{color:var(--human);border-color:rgba(95,233,182,.42);background:rgba(95,233,182,.12)}
+  .badge.fail{color:var(--bot);border-color:rgba(255,125,108,.42);background:rgba(255,125,108,.12)}
+  .badge.idle{color:var(--ink-faint)}
+  .verdict .who{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+
+  .hops{display:flex;flex-direction:column;gap:7px;margin:4px 0 16px}
+  .hoprow{display:grid;grid-template-columns:44px 1fr 62px;align-items:center;gap:9px;
+    font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+  .track{height:7px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+  .track i{display:block;height:100%;border-radius:99px;
+    background:linear-gradient(90deg,rgba(95,233,182,.5),var(--human));transition:width .4s ease}
+  .hoprow.fast .track i{background:linear-gradient(90deg,rgba(255,125,108,.5),var(--bot))}
+  .hoprow b{text-align:right;color:var(--ink);font-weight:500}
+
+  .stats{display:grid;grid-template-columns:1fr auto;gap:7px 12px;
+    font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);
+    padding-top:13px;border-top:1px solid var(--edge)}
+  .stats b{color:var(--ink);font-weight:500}
+
+  .flags{list-style:none;padding:0;margin:14px 0 0;display:flex;flex-direction:column;gap:8px}
+  .flags li{font-size:12.3px;line-height:1.45;padding:9px 12px;border-radius:var(--r-sm);
+    border:1px solid rgba(255,125,108,.30);background:rgba(255,125,108,.09);color:rgba(255,255,255,.88)}
+  .flags li.note{border-color:var(--edge);background:var(--glass-hi);color:var(--ink-soft)}
+
+  .btn{display:block;width:100%;text-align:left;margin-top:9px;
+    font-family:var(--sans);font-size:12.8px;color:var(--ink);
+    padding:10px 14px;border-radius:var(--r-sm);border:1px solid var(--edge);
+    background:var(--glass-hi);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+    cursor:pointer;transition:transform .16s ease,background .2s ease,border-color .2s ease}
+  .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3)}
+  .btn:disabled{opacity:.4;cursor:default;transform:none}
+  .btn .k{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-left:6px}
+  .btn.primary{border-color:rgba(95,233,182,.4);background:rgba(95,233,182,.13)}
+
+  .disclaimer{grid-column:1/-1;margin-top:20px;padding:18px 22px;
+    font-size:12.6px;line-height:1.62;color:var(--ink-soft)}
+  .disclaimer b{color:var(--ink)}
+  .disclaimer em{color:var(--warn);font-style:normal}
+
+  @media (max-width:1120px){
+    .wrap{grid-template-columns:1fr}
+    .board{width:100%;height:auto;aspect-ratio:760/440}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .ambient span{animation:none}
+    *{transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<div class="ambient" aria-hidden="true">
+  <span class="a"></span><span class="b"></span><span class="c"></span>
+</div>
+
+<div class="wrap">
+  <header class="glass">
+    <h1>Sequential-reveal CAPTCHA</h1>
+    <p class="sub">The active second channel. The passive forest handles the confident
+      majority silently; only the deferred score band lands here. Twelve glyphs are
+      rendered <em>server-side</em> as images, so the letters never exist in the page as
+      text. You are told one target at a time — the next is released only once you have
+      clicked the current one, and the release instant is stamped on the
+      <b>server's</b> clock. The route cannot be precomputed and cannot be replayed.</p>
+  </header>
+
+  <div class="card glass">
+    <div class="bar">
+      <div class="promptbox">
+        <img id="prompt" alt="target glyph">
+        <span class="lbl">click the tile showing this letter</span>
+      </div>
+      <div class="pips" id="pips"></div>
+    </div>
+
+    <div class="board" id="board">
+      <canvas id="trail"></canvas>
+      <div class="veil" id="veil"></div>
+    </div>
+
+    <p class="hintline" id="hint">loading challenge…</p>
+  </div>
+
+  <div>
+    <div class="panel glass">
+      <h2>Verdict</h2>
+      <div class="verdict">
+        <span class="badge idle" id="badge">—</span>
+        <span class="who" id="who">no attempt yet</span>
+      </div>
+
+      <div class="hops" id="hops"></div>
+
+      <div class="stats">
+        <span>total wall time</span><b id="sTotal">·</b>
+        <span>hop-time MAD</span><b id="sCv">·</b>
+        <span>trace span vs window</span><b id="sMis">·</b>
+        <span>trace samples</span><b id="sPts">·</b>
+        <span>corrective submovements</span><b id="sCorr">·</b>
+      </div>
+
+      <ul class="flags" id="flags"></ul>
+
+      <button class="btn primary" id="btnNew">↻ new challenge</button>
+    </div>
+
+    <div class="panel glass">
+      <h2>Attack it</h2>
+      <p class="sub" style="font-size:12.3px;margin-bottom:11px">
+        Each sim is <em>handed the answer</em> by a debug route — it assumes a perfect
+        OCR attacker, so only the timing channel is under test.</p>
+      <button class="btn" id="atkInstant">solve instantly <span class="k">· no delay</span></button>
+      <button class="btn" id="atkFixed">fixed 700 ms delay <span class="k">· sleep + move</span></button>
+      <button class="btn" id="atkForge">human pace, forged trace <span class="k">· rewritten timestamps</span></button>
+      <button class="btn" id="atkJitter">jittered human-like <span class="k">· 700 ± 250 ms + bezier</span></button>
+    </div>
+  </div>
+
+  <p class="disclaimer glass">
+    <b>READ BEFORE QUOTING THIS.</b>
+    <em>The thresholds are uncalibrated.</em> Every constant in
+    <span class="m">CaptchaChallenge.Rules</span> is hand-set from first principles —
+    there is no human sample for this challenge, and n=1 is not calibration. They are
+    conservative placeholders. <b>The forest is deliberately not applied here:</b> Tier 3
+    measured that short goal-directed segments push this model from 9.8% to 32.8% human
+    FPR and AUC 0.53 → 0.36, so CAPTCHA hops are the worst possible input for it. This is
+    a second, independent channel with its own scorer; the two scores are never averaged.
+    <b>And this does not make bots impossible.</b> The last attack button passes — a bot
+    that sleeps a jittered human-like delay defeats every rule here today. What the design
+    actually buys is that the attacker is forced <em>online and serialised</em>: it must
+    solve each hop live, in order, inside a window it cannot shrink. That is a throughput
+    tax, not a classification guarantee — the same "defences are attack-specific"
+    conclusion the seven tiers reached, one level up.
+  </p>
+</div>
+
+<script src="challenge.js"></script>
+</body>
+</html>

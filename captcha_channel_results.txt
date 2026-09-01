@@ -1,0 +1,50 @@
+SEQUENTIAL-REVEAL CAPTCHA -- attack probe
+generated 2026-08-31 by: python demo/attack_probe.py <port>   (DemoServer must be running)
+
+Thresholds are UNCALIBRATED -- hand-set in CaptchaChallenge.Rules, not fitted
+to any human sample. No rate below is a deployment number.
+
+Regularity is measured as MAD/median, not the coefficient of variation. CV was
+the first cut and was measured to be useless: a single ~350 ms scheduling hiccup
+in one of five hops took a bot sleeping exactly 700 ms from CV 0.005 to 0.121,
+past the threshold, i.e. the rule passed the bot. Five samples cannot support a
+variance statistic. MAD ignores the outlier. Verified stable over 3 runs.
+
+sequential-reveal CAPTCHA -- attack probe
+server http://127.0.0.1:8796   (thresholds are UNCALIBRATED -- see CaptchaChallenge.Rules)
+================================================================================================
+profile              verdict  measurements
+------------------------------------------------------------------------------------------------
+human-paced          PASS     wall= 5574ms  mad=0.0996  cover=87%   pts=150  corr=4
+                        hops: 1104 1012 1271 973 1214 ms
+bot instant          REJECT   wall=  138ms  mad=0.0000  cover=n/a   pts= 30  corr=-1
+                        hops: 28 27 29 27 27 ms
+                      ! hop completed in 27 ms -- below the 250 ms floor for reading a glyph and moving to it
+                      ! hop timing is near-constant (MAD 0.0000 < 0.02 of the median) -- consistent with a fixed programmed delay
+                      . trace too sparse to corroborate (30 < 40 samples) -- hard signals only
+bot fixed-delay      REJECT   wall= 5379ms  mad=0.0000  cover=87%   pts=150  corr=5
+                        hops: 1075 1075 1074 1081 1075 ms
+                      ! hop timing is near-constant (MAD 0.0000 < 0.02 of the median) -- consistent with a fixed programmed delay
+bot forged-trace     REJECT   wall= 5166ms  mad=0.0841  cover=259%  pts=150  corr=-1
+                        hops: 1070 923 1160 911 1102 ms
+                      ! submitted trace spans 13361 ms but the challenge was only open for 5166 ms -- a client cannot record more time than existed, so these timestamps were written, not measured
+bot jittered         PASS     wall= 4902ms  mad=0.0305  cover=90%   pts=150  corr=4
+                        hops: 859 871 1046 1239 886 ms
+wrong tile           REJECT   wrong tile at hop 3
+------------------------------------------------------------------------------------------------
+replay guard         PASS     second verify=REJECT  (challenge already verified -- replay refused)
+
+SEPARATION (MAD/median, 3 runs):
+  bot fixed-delay  0.0009          <- caught, 20x clear of the 0.02 threshold
+  bot jittered     0.025 - 0.029   <- passes, but only 1.3x clear. THIN.
+  human-paced      0.095 - 0.100
+The jittered bot's margin is thin enough that the rule's placement between it
+and the fixed-delay bot is not meaningfully justified by these three synthetic
+profiles. Treat the regularity rule as secondary; MIN_HOP_WALL_MS is the
+load-bearing hard signal.
+
+hop 1 is NOT an outlier: its window opens at issue(), but across runs it sits
+mid-distribution (1163/1105/1103 ms against a 973-1276 ms human spread), so it
+is not inflating the regularity statistic here. NOTE: the probe is an HTTP
+client, not a browser -- a real browser's hop 1 also carries 13 PNG fetches and
+first paint, which is unmeasured.

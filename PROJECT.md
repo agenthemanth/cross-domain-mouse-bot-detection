@@ -170,8 +170,25 @@ Routes on `DemoServer`: `POST /challenge/new`, `GET /challenge/tile`,
 play without an OCR model; must not ship**).
 
 **Two channels, never one score.** The forest is deliberately *not* applied to
-CAPTCHA traces — Tier 3 measured that short goal-directed segments push it from
-9.79% to 32.8% human FPR and AUC 0.53 → 0.36. See open item 10.
+CAPTCHA traces — on the same 5 held-out users, Tier 3 measured that short
+goal-directed segments push zero-shot human FPR from **10.85% → 28.85%** (7 feat)
+and **32.58% → 71.09%** (14 feat), while pooled bot AUC stays at chance. See open
+item 10.
+
+> ⚠️ **Corrected 2026-09-07.** This sentence used to read *"push it from 9.79% to
+> 32.8% human FPR and AUC 0.53 → 0.36"*. It was wrong twice over:
+> 1. **Stale numbers.** `32.8%` and `0.36` are **pre-rescale** Tier-3 values that
+>    survive only in the STALE `TIER1-4_EVALUATION.html`; `0.53` is the retracted
+>    pre-rescale cross-domain AUC (now 0.4417).
+> 2. **Mismatched populations.** `9.79%` is measured over all 24,182 chunks from all
+>    10 users; Tier 3's action-level FPR is measured over the **5 held-out test
+>    users only**. The matching gap-chunk figure for those 5 users is **10.85%**
+>    (`tier2_augmented_results.txt`, `BASELINE DELBOT_ONLY`).
+>
+> The FPR argument holds (2.66× at 7 feat, 2.18× at 14). The AUC half does not —
+> post-rescale both are already at chance. **The same stale sentence is still in
+> `demo/README.md`, `src/main/java/CaptchaChallenge.java` and `demo/challenge.html`
+> — not yet fixed.** See `PAPER_GUIDE.md` §21.2.
 
 ```
 java -cp "target\classes;<weka>;<bounce>" DemoServer      # then open http://127.0.0.1:8787/
@@ -260,6 +277,7 @@ CNN (Wei et al.), or a velocity-sequence deep model.
 |---|---|
 | `CROSS_DOMAIN_STUDY.html` | ✅ **CANONICAL.** Full 7-tier report + baseline + demo sections. Post-rescale. Extend this one. |
 | `PROJECT.md` | ✅ this file — index and orientation. |
+| `PAPER_GUIDE.md` | ✅ current. Paper-facing A-to-Z walkthrough for the conference writeup: datasets, method, novelty/contributions, per-tier results, mermaid architecture diagrams, limitations, and a full raw-output results appendix (§20) + number audit (§21). **Derives all numbers from the study HTML and the `*_results.txt` files; it is not a second source of truth.** Its §21.2 documents the stale "32.8% / AUC 0.36" Tier-3 claim still repeated in this file, `demo/README.md`, `CaptchaChallenge.java` and `demo/challenge.html`. |
 | `REBASELINE_NOTES.md` | ✅ current. The `circles_human_fast` normalised-coordinate rescale, with the before/after table and how it was measured. |
 | `demo/README.md` | ✅ current. Demo build / parity / run / caveats, plus the CAPTCHA channel's design, trust boundary and measured attack table. |
 | `captcha_channel_results.txt` | ✅ current. Attack-probe log for the CAPTCHA channel. Regenerate with `python demo/attack_probe.py <port>`. |

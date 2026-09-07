@@ -1165,7 +1165,9 @@ These are written in **Mermaid**. They render directly in GitHub and VS Code, an
 you can paste them into <https://mermaid.live> to export SVG/PNG, or redraw them in
 draw.io / Figma for the camera-ready version.
 
-Five diagrams. **Diagram 3 is the one to make Figure 1.**
+Six diagrams. **Diagram 3 is the one to make Figure 1.** Diagram 6 is the full
+system architecture, and its preamble explains what an earlier hand-drawn version
+of it got wrong — read that before you draw any architecture figure of your own.
 
 ### Diagram 1 — the processing pipeline
 
@@ -1316,10 +1318,123 @@ sequenceDiagram
     S-->>C: REJECT - replay refused
 ```
 
+### Diagram 6 — full system architecture, drawn honestly
+
+*Caption suggestion: "System architecture. Solid = implemented and measured;
+dashed = measured but not wired up. The two channels are never fused into one
+score."*
+
+> **Why this diagram exists.** An earlier hand-drawn architecture diagram for this
+> project showed an "Operating Point Calibrator" with dual thresholds
+> τ_low = 0.50 / τ_high = 0.87 feeding a three-way ALLOW / BLOCK / DEFER "Decision
+> and Routing Engine" that routed deferred traffic into the CAPTCHA. **None of that
+> exists.** The project ships a *single* threshold (0.87), the detector is passive
+> (it renders a label on a gauge — see `demo/demo.js`), the CAPTCHA is a separate
+> page a user opens by hand, and nothing routes between them. Drawing the link as
+> built would also contradict the project's own rule that the two channels are never
+> fused.
+>
+> The honest fix is not to delete the reject-option link — it is a real Tier-5
+> measurement and it is the paper's proposal — but to **draw it dashed and label it
+> as not implemented.** That is what the diagram below does. A reviewer who asks
+> "where is this router?" gets the answer from the figure itself.
+
+```mermaid
+flowchart TB
+
+  subgraph OFF["OFFLINE · research pipeline · run once to produce the frozen model"]
+    direction TB
+    D1["DELBOT corpus<br/>3,453 instances<br/>2,596 bot / 857 human<br/>circle-drawing, ~3 s"]:::data
+    D2["Balabit corpus<br/>1,676 files · 10 users<br/>RDP admin work, 40-80 min<br/>ALL HUMAN — contains no bots"]:::data
+    PRE["Preprocess<br/>collapse tied timestamps · dt floor 1 ms<br/>segment on 3 s idle · keep chunks >= 20 pts"]:::built
+    CH["24,182 human gap-chunks<br/>median 13.6 s / 66 pts"]:::data
+    SYN["Matched-twin bot synthesis<br/>BalabitBotSynthesizer — naive<br/>AdversarialBotSynthesizer — SHUFFLE / BALLISTIC<br/>holds start, end, point count, duration CONSTANT<br/>so those columns cannot leak the label"]:::built
+    FE["Tier2Features<br/>BASELINE 7 · AUGMENTED 18 · AUGMENTED_SEQ 20"]:::built
+    RF["Weka RandomForest<br/>100 trees · seed 1"]:::built
+    FRZ["DemoModelTrainer freezes<br/>AUGMENTED-18 / AUG_NAIVE_PLUS<br/>5 Balabit users held out<br/>writes demo/model/rf.model"]:::built
+
+    D2 --> PRE --> CH
+    CH --> SYN
+    D1 --> FE
+    CH --> FE
+    SYN --> FE
+    FE --> RF --> FRZ
+  end
+
+  subgraph C1["CHANNEL 1 · passive detector · BUILT"]
+    direction TB
+    A1["Capture arena<br/>demo/index.html + demo/demo.js"]:::built
+    A2["JS feature extractor<br/>demo/features.js — AUGMENTED 18<br/>hand port of the Java pipeline"]:::built
+    A3["Parity gate — offline, pre-demo only<br/>node demo/parity.js<br/>25 golden vectors · worst rel err 7e-12"]:::gate
+    A4["POST /score  ->  DemoServer<br/>18 feature values"]:::built
+    A5["Frozen RandomForest<br/>P of bot in [0,1]"]:::built
+    A6["SINGLE threshold 0.87<br/>score >= 0.87 gives label BOT<br/>score < 0.87 gives label HUMAN"]:::built
+    A7["Renders a label on a gauge.<br/>NO enforcement action is taken."]:::built
+
+    A1 --> A2 --> A4 --> A5 --> A6 --> A7
+    A3 -.->|"validates, does not sit in the request path"| A2
+  end
+
+  subgraph C2["CHANNEL 2 · sequential-reveal CAPTCHA · BUILT, and SEPARATE"]
+    direction TB
+    B1["demo/challenge.html<br/>opened by hand — nothing routes here"]:::built
+    B2["CaptchaChallenge.java<br/>12 server-rendered glyph PNGs · 5 hops<br/>ONE target revealed at a time"]:::built
+    B3["Server clock stamps every reveal and arrival<br/>route unknowable in advance<br/>cannot be precomputed or replayed"]:::built
+    B4["OWN rule-based scorer — no ML<br/>HARD, server clock, unforgeable:<br/>hop wall >= 250 ms · MAD/median >= 0.02<br/>SOFT, client trace, corroboration only:<br/>overrun <= 10% · coverage · dwell"]:::built
+    B5["PASS / REJECT"]:::built
+
+    B1 --> B2 --> B3 --> B4 --> B5
+  end
+
+  subgraph PROP["PROPOSED · measured in Tier 5, NOT IMPLEMENTED"]
+    direction TB
+    R1["Reject option — band of +/-10%<br/>around the operating point 0.81<br/>coverage 93.98%<br/>kept human FPR 0.52%<br/>evasive recall 69.14%"]:::prop
+    R2["Route the deferred band to Channel 2"]:::prop
+    R1 -.-> R2
+  end
+
+  FRZ ==>|"frozen model artefact"| A5
+  A6 -.->|"NOT BUILT — no router exists"| R1
+  R2 -.->|"NOT BUILT"| B1
+
+  NOTE["TWO CHANNELS, NEVER ONE SCORE.<br/>The forest is deliberately NOT applied to CAPTCHA traces.<br/>Tier 3 measured that mistake: on the same 5 held-out users,<br/>short goal-directed segments push zero-shot human FPR<br/>from 10.85% to 28.85% at 7 features,<br/>and from 32.58% to 71.09% at 14 features.<br/>The two verdicts are never averaged."]:::note
+  C1 -.- NOTE
+  C2 -.- NOTE
+
+  LEG["LEGEND<br/>solid box + solid arrow = implemented and measured<br/>dashed box + dashed arrow = measured but not wired up<br/>thick arrow = build-time artefact handoff"]:::legend
+
+  classDef data   fill:#E9EBEE,stroke:#5B6470,color:#1A1E1B
+  classDef built  fill:#E3F0E6,stroke:#2E7D48,color:#1A1E1B
+  classDef gate   fill:#E4EFE9,stroke:#2F6D53,color:#1A1E1B,stroke-dasharray:4 3
+  classDef prop   fill:#F4EBD8,stroke:#8A6410,color:#1A1E1B,stroke-dasharray:6 4
+  classDef note   fill:#F5E2DF,stroke:#A6392E,color:#1A1E1B
+  classDef legend fill:#FFFFFF,stroke:#C3CABF,color:#565E57
+```
+
+**What changed relative to the hand-drawn version, and why each change matters:**
+
+| Hand-drawn version | Honest version | Why |
+|---|---|---|
+| "Operating Point Calibrator · dual thresholds τ_low 0.50 / τ_high 0.87" | **One** threshold, 0.87 | The project ships a single threshold. No dual-threshold scheme exists anywhere in the code or the results files. |
+| "Decision & Routing Engine · ALLOW / BLOCK / DEFER" as a built component | Detector renders a label; **routing shown dashed as NOT IMPLEMENTED** | `demo/demo.js` produces a binary `BOT`/`HUMAN` label on a gauge. There is no enforcement and no router. |
+| DEFER band = 0.50–0.87 | Reject band = **±10% around 0.81** | The Tier-5 measurement is a ±10% band, and it is the only band with real numbers attached. A 0.50–0.87 band would defer a large share of all traffic and has never been measured. |
+| P(bot) feeds the CAPTCHA as one pipeline | Two channels drawn **separately**, with an explicit "never one score" note | Fusing them contradicts the project's core design rule and the Tier-3 measurement behind it. |
+| "18/20 feature vector" | **AUGMENTED-18** | The frozen demo model does not use the 2 ordering features; AUGMENTED_SEQ-20 is a separate Tier-6 experiment. |
+| "Resolution Normalizer · screen fraction → pixels" as a runtime stage | Folded into the offline DELBOT parse | That rescale is the Bug-2 fix for 9 DELBOT *training* files. It is not a live pipeline stage. |
+| `parity.js` inline in the scoring path | Drawn as an **offline gate**, dashed, off the request path | `node demo/parity.js` is a pre-demo check. The browser scores through `features.js`. |
+| No training-data provenance | Offline lane showing **DELBOT → Balabit → matched twins** | The cross-domain structure *is* the paper's contribution. An architecture figure that hides it describes a product instead of a study. |
+| Title: "Adaptive CAPTCHA System Architecture" | Nothing in the system adapts online | "Adaptive" implies online learning or threshold adaptation. Neither exists — the model and every threshold are frozen. |
+
+**If you want a second, cleaner figure for the proposal itself,** use Diagram 4 above
+(the two-channel decision flow) and caption it explicitly as *proposed deployment
+architecture*, keeping this Diagram 6 as *implemented system*. Two figures with
+honest captions are much stronger than one figure that blurs the two — and the blur
+is exactly what a reviewer probes.
+
 ### If your venue wants static figures instead
 
-Any of the five will export cleanly from <https://mermaid.live>. Diagram 3 is the
-story figure and deserves the most polish. Beyond these five, the two figures most
+Any of the six will export cleanly from <https://mermaid.live>. Diagram 3 is the
+story figure and deserves the most polish. Beyond these six, the two figures most
 worth drawing **from data** (not as diagrams) are:
 
 - **An ROC curve overlay** — Tier 1 (0.4417) vs Tier 2 augmented (0.998) vs Tier 4

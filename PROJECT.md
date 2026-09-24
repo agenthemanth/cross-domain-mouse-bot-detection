@@ -151,7 +151,7 @@ optimism, and it is why the honest headline is ~3.4% FPR, not ~1%.
 |---|---|
 | `DemoModelTrainer.java` | One-time: freezes the Tier-4 `AUGMENTED` / `AUG_NAIVE_PLUS` model into `demo/model/` — `rf.model`, `schema.arff`, `operating_point.txt` (threshold 0.87), `golden_vectors.json`. ⚠️ The 0.87 is picked on the **same** 5 held-out users it then reports 0.9% FPR against — same-data optimistic; see open item 4, real unseen-user FPR ~1.5–2%. |
 | `DemoServer.java` | `com.sun.net.httpserver` on 127.0.0.1:8787. Serves `demo/` statically and `POST /score` with `{"features":[<18 numbers>]}` → `{"score","label","threshold"}`. |
-| `demo/index.html` | The **only** page — the live detector. Capture arena, P(bot) gauge, movable decision line, 4 bot-sim buttons. |
+| `demo/index.html` | The landing page — the live detector. Capture arena, P(bot) gauge, movable decision line, 4 bot-sim buttons. Header CTA → `/login.html`. |
 | `demo/features.js` | Hand port of `Tier2Features.compute(AUGMENTED)` to JS. |
 | `demo/parity.js` | `node demo/parity.js` — recomputes the 25 golden vectors and asserts a Java match. Must print `PARITY PASS` (worst rel err ~7e-12). **Run before demoing**; without it the live score is untrustworthy even with a correct model. |
 | `demo/demo.js` | Capture → chunking → feature → `/score` wiring, gauge, bot sims. |
@@ -163,6 +163,20 @@ optimism, and it is why the honest headline is ~3.4% FPR, not ~1%.
 | `CaptchaChallenge.java` | Sequential-reveal CAPTCHA. 12 server-rendered distorted glyph PNGs (`java.awt`, no new deps), 5 hops, **one target revealed at a time** with each release stamped on the server clock — so the route cannot be precomputed or replayed. Owns its own rule-based scorer and `Rules` thresholds. |
 | `demo/challenge.html`, `demo/challenge.js` | The challenge page and its four in-page attack sims. |
 | `demo/attack_probe.py` | `python demo/attack_probe.py <port>` — drives `/challenge/*` end to end and prints the verdict each attacker profile gets. Stdlib only. → `captcha_channel_results.txt` |
+
+### Test login page (moving puzzle + passive check, judged together)
+
+| file | what it does |
+|---|---|
+| `PerturbationPuzzle.java` | Drag-to-slot puzzle whose slot **jumps mid-drag** at a secret, server-chosen point. Piece positions stream to the server and are stamped on its clock, so re-aim latency is measured server-side. Own uncalibrated `Rules`: re-aim is a sustained ≥15 px departure from pre-jump momentum; onset must be ≥ 100 ms; jump→place must be ≥ 300 ms. Single-use. |
+| `demo/login.html`, `demo/login.js` | "Test Portal" sign-in (`demo` / `letmein`), linked from the header of `/`. Background mouse capture (drag excluded) + the puzzle, plus the L1–L4 bot ladder. |
+| `demo/login_probe.py` | `python demo/login_probe.py <port>` — the puzzle ladder, headless. → `login_channel_results.txt` |
+
+Routes: `POST /puzzle/new`, `/puzzle/move`, `/puzzle/drop`, and `POST /auth/login`. The login
+route scores the background trace with the forest **server-side** and applies the decision table
+(puzzle fail → BOT; background ≥ 0.87 → BOT veto; otherwise HUMAN). The two scores are never
+averaged. L1–L3 are blocked. **L4 (sampled human latency) passes**, and the passive channel
+vetoed none of the four sims. Thresholds are uncalibrated. See `demo/README.md`.
 
 Routes on `DemoServer`: `POST /challenge/new`, `GET /challenge/tile`,
 `GET /challenge/prompt`, `POST /challenge/arrive`, `POST /challenge/verify`, and
@@ -281,6 +295,7 @@ CNN (Wei et al.), or a velocity-sequence deep model.
 | `REBASELINE_NOTES.md` | ✅ current. The `circles_human_fast` normalised-coordinate rescale, with the before/after table and how it was measured. |
 | `demo/README.md` | ✅ current. Demo build / parity / run / caveats, plus the CAPTCHA channel's design, trust boundary and measured attack table. |
 | `captcha_channel_results.txt` | ✅ current. Attack-probe log for the CAPTCHA channel. Regenerate with `python demo/attack_probe.py <port>`. |
+| `login_channel_results.txt` | ✅ current. Puzzle bot-ladder log (L1–L4, replay). Regenerate with `python demo/login_probe.py <port>`. |
 | `TIER1-4_EVALUATION.html` | ⚠️ **STALE.** Pre-rescale numbers throughout (0.5326, 9.85%, 12.39%) and still discusses the retracted 1.07% FPR. It is paper-facing, so anyone quoting it quotes retracted figures. Update deliberately or delete. |
 | `AGENT_HANDOFF.txt` | ⚠️ **SUPERSEDED** by this file. Tier-1-era; pre-rescale numbers and the retracted AUC-0.72 mis-citation. Kept only for the session narrative. |
 | `balabit_data/README.md` | dataset documentation (upstream). |

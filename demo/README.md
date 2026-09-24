@@ -84,6 +84,83 @@ depend on the viewer's screen / mouse / DPI. So:
 
 ---
 
+## The test login page (`/login.html`)
+
+Linked from the header of `/`. It's a throwaway "Test Portal" sign-in (test account
+`demo` / `letmein`) where **two checks run at the same time** and the server judges
+both at `POST /auth/login`:
+
+1. **Background mouse movement.** Every mousemove on the page is captured, except
+   while you're dragging the puzzle piece; each drag boundary starts a new segment.
+   The server splits the trace with the 3 s gap rule and scores each chunk with ≥20
+   distinct points using the frozen forest (`Tier2Features.compute(AUGMENTED)`,
+   server-side, so the client can't lie about its features). The channel verdict is
+   the median chunk score against the 0.87 line.
+2. **Moving puzzle** (`PerturbationPuzzle.java`). Drag the piece to the slot.
+   While you drag, the piece position streams to `/puzzle/move` and is stamped on the
+   **server clock**. After a secret fraction of the course (20–35%), one reply moves
+   the slot roughly perpendicular to the course, by 60–85 px. The server then measures
+   the re-aim onset from its own sample log. A person corrects after a visuomotor
+   delay. An open-loop bot never corrects. A naive closed-loop bot corrects in one
+   frame.
+
+The decision table has no averaging:
+
+| puzzle | background | decision |
+|---|---|---|
+| fail | any | BOT |
+| pass | ≥ 0.87 | BOT (veto) |
+| pass | < 0.87 | HUMAN |
+| pass | < 20 points | HUMAN (no evidence) |
+
+**Bot ladder**, in-page buttons and `python demo/login_probe.py <port>`
+(→ `login_channel_results.txt`, puzzle isolated):
+
+| level | what it does | outcome |
+|---|---|---|
+| L1 | pyautogui-style lines; drags straight to where the slot *was* | BOT: misses the moved slot |
+| L2 | Tier-4 shuffled-speed evasive mouse; pre-planned drag | BOT: misses the moved slot |
+| L3 | reads the slot from the DOM every frame, re-aims at once | BOT: onset ~18 ms < 100 ms floor |
+| L4 | reads the slot, waits a sampled 180–260 ms, then re-aims | **HUMAN: passes** |
+
+Measured in headless Chrome at 1400×1000 (2026-09-24): the background scores for the
+four sims were 0.64–0.71 / 0.42–0.44 / 0.43–0.46 / 0.42–0.44 across two runs, so **the
+passive channel vetoed none of them**. That is the Tier 4 result reproduced live:
+passive statistics can be copied. L1's score depends on layout: pyautogui-style lines
+scored 0.88 on a different geometry. A scripted trusted-event run through the real
+pointer handlers (not a person) passed both times, with background 0.31–0.39.
+
+**Human-shaped drags.** The probe also runs motor *models*, not people: 10 drags bowed
+±30 px and 6 bowed ±45 px, all with ~1.5 px tremor and a 180–260 ms delayed smooth
+re-aim, plus 3 runs that miss, pause 3 s and re-grab. All 19 pass.
+
+Two rules changed because of these runs:
+- **Re-aim threshold raised from 6 px to 15 px.** At 6 px, with a walk-back to
+  baseline, curvature alone timed 4 of 10 ±30 px drags as "too fast". The 15 px rule
+  reports the crossing time itself, which overstates latency; that errs toward
+  passing a person.
+- **Maximum-onset rule removed.** It rejected the miss-and-re-grab path.
+
+If a strongly curved drag hides the onset, the latency rule is skipped and noted. The
+piece still had to land on the moved slot.
+
+**Caveats.**
+- **Every puzzle threshold is hand-set.** `PerturbationPuzzle.Rules` has not been
+  calibrated on any human sample.
+- **Real-hand behaviour is unverified.** In particular, no one has checked whether
+  ordinary human background movement on this page trips the 0.87 veto. If it does,
+  that is the domain-shift failure documented under *Known behaviour*. Soften the
+  rule openly; don't hide it.
+- **L4 passing is the honest limit.** The puzzle doesn't yet check the *shape* of the
+  correction, and a bot that models human latency gets in. What the puzzle buys is
+  cost: the attacker must run a live closed-loop controller with a human latency
+  model, not replay a pre-planned path.
+- **Positions are still client-claimed.** Only the timing is server-owned. The
+  latency is measured over a localhost round trip, and over a real network, jitter
+  would blur the 100 ms floor.
+
+---
+
 ## The CAPTCHA channel
 
 `/challenge.html` + `CaptchaChallenge.java`. This is the destination for the

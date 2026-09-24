@@ -82,6 +82,13 @@
   .sub code{font-family:var(--mono);font-size:11.5px;color:var(--ink);
     background:var(--glass-hi);padding:1px 6px;border-radius:6px;border:1px solid var(--edge)}
 
+  .cta{align-self:flex-start;margin-top:10px;display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;
+    padding:11px 18px;border-radius:var(--r-md);text-decoration:none;color:var(--ink);font-weight:600;font-size:14px;
+    border:1px solid rgba(95,233,182,.45);background:rgba(95,233,182,.14);
+    transition:transform .16s ease,background .2s ease}
+  .cta:hover{transform:translateY(-1px);background:rgba(95,233,182,.22)}
+  .cta small{font-weight:400;font-size:12px;color:var(--ink-soft)}
+
   /* ---------- arena ---------- */
   .arena{
     position:relative;height:472px;overflow:hidden;cursor:crosshair;
@@ -197,6 +204,8 @@
       Random Forest. The browser computes the 18 features — bit-parity with the Java
       pipeline, verified by <code>demo/parity.js</code> — and posts them to a local
       scorer. Chunks are gap-split at 3&nbsp;s and need ≥20 distinct-time samples.</p>
+    <a class="cta" href="/login.html">Open the test login page <span>→</span>
+      <small>background mouse check + moving puzzle, judged together at sign-in</small></a>
   </header>
 
   <div class="arena" id="arena">

@@ -220,8 +220,8 @@
     <span class="m">CaptchaChallenge.Rules</span> is hand-set from first principles —
     there is no human sample for this challenge, and n=1 is not calibration. They are
     conservative placeholders. <b>The forest is deliberately not applied here:</b> Tier 3
-    measured that short goal-directed segments push this model from 9.8% to 32.8% human
-    FPR and AUC 0.53 → 0.36, so CAPTCHA hops are the worst possible input for it. This is
+    measured that short goal-directed segments push zero-shot human FPR from 10.85% to 28.85%
+    (7 features) and 32.58% to 71.09% (14), so CAPTCHA hops are the worst possible input for it. This is
     a second, independent channel with its own scorer; the two scores are never averaged.
     <b>And this does not make bots impossible.</b> The last attack button passes — a bot
     that sleeps a jittered human-like delay defeats every rule here today. What the design

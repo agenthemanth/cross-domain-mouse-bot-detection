@@ -55,3 +55,14 @@ feature_range_diag.txt
 ### demo server logs
 demo/_srv.*
 demo/_server.*
+
+### participant study log (personal-ish data; share deliberately, never by accident)
+demo/study_data/
+
+### Report / presentation files (kept local, not published)
+*.docx
+*.pdf
+*.pptx
+report_assets/
+PRESENTATION_SPEECH.md
+IEEE_PAPER_HANDBOOK.md

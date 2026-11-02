@@ -168,15 +168,22 @@ optimism, and it is why the honest headline is ~3.4% FPR, not ~1%.
 
 | file | what it does |
 |---|---|
-| `PerturbationPuzzle.java` | Drag-to-slot puzzle whose slot **jumps mid-drag** at a secret, server-chosen point. Piece positions stream to the server and are stamped on its clock, so re-aim latency is measured server-side. Own uncalibrated `Rules`: re-aim is a sustained ≥15 px departure from pre-jump momentum; onset must be ≥ 100 ms; jump→place must be ≥ 300 ms. Single-use. |
-| `demo/login.html`, `demo/login.js` | "Test Portal" sign-in (`demo` / `letmein`), linked from the header of `/`. Background mouse capture (drag excluded) + the puzzle, plus the L1–L4 bot ladder. |
-| `demo/login_probe.py` | `python demo/login_probe.py <port>` — the puzzle ladder, headless. → `login_channel_results.txt` |
+| `PerturbationPuzzle.java` | Drag-to-slot puzzle whose slot **jumps mid-drag** at a secret, server-chosen point (the double-step paradigm). The board is a server-rendered PNG with 3 decoy outlines, so the slot position is never sent as a number. Positions stream sequence-numbered (stale arrivals dropped) and are stamped on the server clock. The jump reply carries an **ack token**, and latency is measured from the ack's arrival, so network round trip is not counted as reaction. Own uncalibrated `Rules`: re-aim is a sustained ≥15 px departure from pre-ack momentum; onset ≥ 100 ms after the ack; ack→place ≥ 300 ms. Single-use. |
+| `demo/login.html`, `demo/login.js` | "Test Portal" sign-in (`demo` / `letmein`), linked from the header of `/`. Background mouse capture (drag excluded) + the puzzle, plus the L1–L4 bot ladder, whose bots find the slot **by vision** (white-box locator on the board PNG, ~11–28 ms per read). `?study=1&p=<code>` = participant-study mode (verdicts hidden, trials logged). |
+| `demo/login_probe.py` | Needs `DemoServer <port> --oracle`. `python demo/login_probe.py <port>`: runs the bot ladder and human motor models over 4 **simulated** links (localhost → 120±35 ms one-way). → `login_channel_results.txt` |
+| `demo/analyze_trials.py` | `python demo/analyze_trials.py`: study log → participant-level pass rates (Wilson CI), onset distributions, passive false-veto rate, thresholds calibrated on half the participants and reported on the other half. |
+| `LatencyBench.java` | Times feature extraction + forest score on the frozen demo model over the 25 golden chunks. → `latency_results.txt` |
 
-Routes: `POST /puzzle/new`, `/puzzle/move`, `/puzzle/drop`, and `POST /auth/login`. The login
+Routes: `POST /puzzle/new`, `/puzzle/move`, `/puzzle/drop`, `POST /auth/login`, and
+`GET /puzzle/oracle` (**off unless `--oracle`; probes only; must not ship**). The login
 route scores the background trace with the forest **server-side** and applies the decision table
 (puzzle fail → BOT; background ≥ 0.87 → BOT veto; otherwise HUMAN). The two scores are never
-averaged. L1–L3 are blocked. **L4 (sampled human latency) passes**, and the passive channel
-vetoed none of the four sims. Thresholds are uncalibrated. See `demo/README.md`.
+averaged. With `--log-trials` every sign-in is appended to `demo/study_data/trials.jsonl`
+(git-ignored; no username, password or background trace). L1–L3 are blocked on every simulated
+link; the old send-referenced rule, recomputed on the same trials, would pass L3 6/6 at ≥120 ms RTT. **L4 (vision +
+sampled human latency) passes**, and the passive channel vetoed none of the sims. Thresholds are
+uncalibrated until the participant study runs (`PAPER_GUIDE.md` §12b.6). `run_demo.bat` passes its
+arguments through, e.g. `run_demo.bat --log-trials`.
 
 Routes on `DemoServer`: `POST /challenge/new`, `GET /challenge/tile`,
 `GET /challenge/prompt`, `POST /challenge/arrive`, `POST /challenge/verify`, and
@@ -200,9 +207,9 @@ item 10.
 >    (`tier2_augmented_results.txt`, `BASELINE DELBOT_ONLY`).
 >
 > The FPR argument holds (2.66× at 7 feat, 2.18× at 14). The AUC half does not —
-> post-rescale both are already at chance. **The same stale sentence is still in
+> post-rescale both are already at chance. The same stale sentence in
 > `demo/README.md`, `src/main/java/CaptchaChallenge.java` and `demo/challenge.html`
-> — not yet fixed.** See `PAPER_GUIDE.md` §21.2.
+> was **fixed 2026-09-24** (figures re-checked against the raw result files). See `PAPER_GUIDE.md` §21.2.
 
 ```
 java -cp "target\classes;<weka>;<bounce>" DemoServer      # then open http://127.0.0.1:8787/
@@ -243,8 +250,10 @@ See `demo/README.md` for the full demo notes, including the threshold caveat.
    This is why Tier 5's honest headline is ~3.4% FPR, not ~1% — and why the demo's
    threshold 0.87 / "0.9% human FPR" pair is optimistic (chosen on the users it
    reports against). Not fixed for the demo; stated as a caveat in `demo/README.md`.
-5. **Latency is asserted, not measured** — the real-time claim has never been timed
-   for the 100-tree forest plus 20-feature extraction.
+5. **Latency: measured server-side, 2026-09-24** (`LatencyBench` → `latency_results.txt`).
+   18-feature extraction + 100-tree forest: p50 0.10 ms, p99 0.78 ms per chunk (worst 33 ms,
+   a JIT/GC outlier). Network, browser-side JS extraction and cold start are unmeasured,
+   so claim "sub-millisecond server-side scoring", not "real-time end to end".
 
 **Known defects, not fixed**
 
@@ -253,15 +262,19 @@ See `demo/README.md` for the full demo notes, including the threshold caveat.
    `mean_velocity_delbot` is the mean of a precomputed velocity field (~1000× scale
    gap, has negatives) and accel/jerk there are true time-derivatives while DELBOT
    training uses plain first differences. Only `num_points`, `duration_ms` and
-   `path_efficiency` are comparable. **Recommendation:** treat the Balabit pipeline
-   as the sound cross-dataset evaluation; either restrict the mightymerge check to
-   those 3 columns or drop mightymerge from the paper's cross-dataset story.
+   `path_efficiency` are comparable. **Decided 2026-09-24: dropped from the paper's
+   cross-dataset claims** (restricting to 3 columns would need a retrained model, and the
+   models are frozen). The Balabit pipeline is the cross-dataset result. See `PAPER_GUIDE.md` §4.3.
 7. **Raw max velocity ~1277 px/ms is unphysical** — the 1 ms `dt` floor is too
    coarse for large position jumps. Fixing it would move the Tier-1 baseline, so do
    it as a deliberate, announced re-baseline, never silently.
-8. **Citations:** Iliou et al. 2021 (both entries) and Wei et al. 2019 are
-   **UNVERIFIED** — treat their exact numbers as unconfirmed until checked against
-   the papers. A prior session mis-cited arXiv 2504.21415 as a "cross-dataset RF
+8. **Citations:** bibliographically verified 2026-09-24 (publisher/DBLP): Iliou et al. 2021
+   (doi 10.1145/3447815) and 2019 (ARES, doi 10.1145/3339252.3339267), Wei, Zhao & Cai 2019
+   (CCBR, doi 10.1007/978-3-030-31456-9_43), BeCAPTCHA-Mouse (Pattern Recognition 2022), and
+   the puzzle's prior art Prablanc & Martin 1992, Day & Lyon 2000. That is existence + abstract,
+   **not** the full text: any number quoted from them still needs reading. The "RF AUC 0.72 vs
+   deep 0.98" within-Balabit claim is still unsourced and has been withdrawn from
+   `CROSS_DOMAIN_STUDY.html`. A prior session mis-cited arXiv 2504.21415 as a "cross-dataset RF
    AUC 0.72" result; it is **not** (within-dataset user authentication, no
    cross-dataset eval anywhere in it). That error propagated into tier docs before
    it was caught. Re-verify every citation before it enters the manuscript.
@@ -276,6 +289,12 @@ See `demo/README.md` for the full demo notes, including the threshold caveat.
     classification guarantee); the regularity rule is secondary and its threshold
     sits only ~1.3× clear of that bot; the glyph distortion is a speed bump, not
     the security property; and `/challenge/oracle` must not ship.
+11. **The perturbation puzzle has no human sample.** Its "human" rows are motor models and
+    scripted trusted-event drags. Two rules were already changed against those models. L4 passes
+    by design. The "re-aim not timeable" branch skips the latency rule for strongly curved drags
+    (a bot could gamble on it; it still needs ≥ 300 ms ack→place). Network results are on a
+    simulated link. **Next step: the participant study** (`PAPER_GUIDE.md` §12b.6, harness
+    ready), then edit `PerturbationPuzzle.Rules` openly from `analyze_trials.py` output.
 
 **Next real lever**
 
@@ -292,11 +311,13 @@ CNN (Wei et al.), or a velocity-sequence deep model.
 | `CROSS_DOMAIN_STUDY.html` | ✅ **CANONICAL.** Full 7-tier report + baseline + demo sections. Post-rescale. Extend this one. |
 | `PROJECT.md` | ✅ this file — index and orientation. |
 | `PAPER_GUIDE.md` | ✅ current. Paper-facing A-to-Z walkthrough for the conference writeup: datasets, method, novelty/contributions, per-tier results, mermaid architecture diagrams, limitations, and a full raw-output results appendix (§20) + number audit (§21). **Derives all numbers from the study HTML and the `*_results.txt` files; it is not a second source of truth.** Its §21.2 documents the stale "32.8% / AUC 0.36" Tier-3 claim still repeated in this file, `demo/README.md`, `CaptchaChallenge.java` and `demo/challenge.html`. |
+| `IEEE_PAPER_HANDBOOK.md` | ✅ current (2026-10-06). Handbook for a co-author new to the project: plain-language overview, result-vs-design-vs-demo split, algorithms as pseudocode, a master results sheet (copied from `PAPER_GUIDE.md` §20 + `latency_results.txt` + `login_channel_results.txt`), banned numbers, IEEE format/page budget, and copy-paste LLM prompts (one master prompt + one per paper section + an audit prompt). Not a source of truth. |
 | `REBASELINE_NOTES.md` | ✅ current. The `circles_human_fast` normalised-coordinate rescale, with the before/after table and how it was measured. |
 | `demo/README.md` | ✅ current. Demo build / parity / run / caveats, plus the CAPTCHA channel's design, trust boundary and measured attack table. |
 | `captcha_channel_results.txt` | ✅ current. Attack-probe log for the CAPTCHA channel. Regenerate with `python demo/attack_probe.py <port>`. |
-| `login_channel_results.txt` | ✅ current. Puzzle bot-ladder log (L1–L4, replay). Regenerate with `python demo/login_probe.py <port>`. |
-| `TIER1-4_EVALUATION.html` | ⚠️ **STALE.** Pre-rescale numbers throughout (0.5326, 9.85%, 12.39%) and still discusses the retracted 1.07% FPR. It is paper-facing, so anyone quoting it quotes retracted figures. Update deliberately or delete. |
+| `login_channel_results.txt` | ✅ current (2026-09-24). Puzzle ladder + human models across 4 simulated links, with old-vs-new timing rule. Regenerate: `DemoServer <port> --oracle`, then `python demo/login_probe.py <port>`. |
+| `latency_results.txt` | ✅ current. `LatencyBench` output. |
+| `TIER1-4_EVALUATION.html` | ⚠️ **STALE**, now carries a SUPERSEDED banner at the top. Pre-rescale numbers throughout (0.5326, 9.85%, 12.39%) and the retracted 1.07% FPR. Kept for history; never quote. |
 | `AGENT_HANDOFF.txt` | ⚠️ **SUPERSEDED** by this file. Tier-1-era; pre-rescale numbers and the retracted AUC-0.72 mis-citation. Kept only for the session narrative. |
 | `balabit_data/README.md` | dataset documentation (upstream). |
 

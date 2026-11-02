@@ -96,13 +96,18 @@ both at `POST /auth/login`:
    distinct points using the frozen forest (`Tier2Features.compute(AUGMENTED)`,
    server-side, so the client can't lie about its features). The channel verdict is
    the median chunk score against the 0.87 line.
-2. **Moving puzzle** (`PerturbationPuzzle.java`). Drag the piece to the slot.
-   While you drag, the piece position streams to `/puzzle/move` and is stamped on the
-   **server clock**. After a secret fraction of the course (20–35%), one reply moves
-   the slot roughly perpendicular to the course, by 60–85 px. The server then measures
-   the re-aim onset from its own sample log. A person corrects after a visuomotor
-   delay. An open-loop bot never corrects. A naive closed-loop bot corrects in one
-   frame.
+2. **Moving puzzle** (`PerturbationPuzzle.java`). Drag the piece onto the outline
+   of the same shape. The board is a **server-rendered PNG** with three decoy
+   outlines, so the slot's position is never sent as a number. While you drag, the
+   piece position streams to `/puzzle/move` (sequence-numbered, up to 6 in flight)
+   and is stamped on the **server clock**. After a secret fraction of the course
+   (20–35%), a reply delivers a new board: the slot has moved 60–85 px perpendicular
+   to the course and the decoys have shifted. The reply also carries an **ack token**
+   that the client echoes on every later report. The server measures the re-aim onset
+   **from the ack's arrival**. The ack and the re-aim cross the same uplink, so
+   network round trip is not mistaken for reaction time. A person corrects after a
+   visuomotor delay. An open-loop bot never corrects. A naive closed-loop bot
+   corrects in the ack message itself.
 
 The decision table has no averaging:
 
@@ -113,28 +118,42 @@ The decision table has no averaging:
 | pass | < 0.87 | HUMAN |
 | pass | < 20 points | HUMAN (no evidence) |
 
-**Bot ladder**, in-page buttons and `python demo/login_probe.py <port>`
-(→ `login_channel_results.txt`, puzzle isolated):
+**Bot ladder.** The in-page buttons find the slot **by vision**: a white-box locator
+thresholds the board PNG, takes connected components and matches them against the
+piece's outline. It costs ~11–28 ms per board read in headless Chrome, and the page
+shows the measured cost. `python demo/login_probe.py <port>` needs
+`DemoServer <port> --oracle` and reads the slot from the oracle instead. That gives
+every bot free, perfect perception and isolates the timing channel. The probe
+writes `login_channel_results.txt`.
 
-| level | what it does | outcome |
+| level | what it does | outcome (every simulated link) |
 |---|---|---|
 | L1 | pyautogui-style lines; drags straight to where the slot *was* | BOT: misses the moved slot |
 | L2 | Tier-4 shuffled-speed evasive mouse; pre-planned drag | BOT: misses the moved slot |
-| L3 | reads the slot from the DOM every frame, re-aims at once | BOT: onset ~18 ms < 100 ms floor |
-| L4 | reads the slot, waits a sampled 180–260 ms, then re-aims | **HUMAN: passes** |
+| L3 | re-reads the slot every frame, re-aims at once | BOT: onset 0–52 ms after the ack (1 of 12 untimed, caught by the 300 ms ack→place floor) |
+| L4 | re-reads the slot, waits a sampled 180–260 ms, then re-aims | **HUMAN: passes** |
 
-Measured in headless Chrome at 1400×1000 (2026-09-24): the background scores for the
-four sims were 0.64–0.71 / 0.42–0.44 / 0.43–0.46 / 0.42–0.44 across two runs, so **the
-passive channel vetoed none of them**. That is the Tier 4 result reproduced live:
-passive statistics can be copied. L1's score depends on layout: pyautogui-style lines
-scored 0.88 on a different geometry. A scripted trusted-event run through the real
-pointer handlers (not a person) passed both times, with background 0.31–0.39.
+**Network.** The probe runs every rung and the human models over four *simulated*
+links. Each message gets its own Gaussian one-way delay: 0, 20±5, 60±15 and
+120±35 ms. The **old** rule timed the re-aim from when the jump was *sent*. Recomputed
+on these trials' raw onsets (the old code itself was not rerun), it lets L3 through
+3/3 at ~120 ms and 3/3 at ~240 ms round trip, because the round trip counts as
+"reaction". That is a lower bound. With the ack-referenced rule L3 is blocked
+12/12, and the human models pass 48/48. Fixing this turned up a second loophole: the ack-carrying
+sample had been treated as pre-reaction baseline, so a bot that re-aimed in that
+message hid the correction. It now counts as post-reaction.
 
-**Human-shaped drags.** The probe also runs motor *models*, not people: 10 drags bowed
-±30 px and 6 bowed ±45 px, all with ~1.5 px tremor and a 180–260 ms delayed smooth
-re-aim, plus 3 runs that miss, pause 3 s and re-grab. All 19 pass.
+**In headless Chrome** (1400×1000, 2026-09-24): L1 and L2 missed, L3 was blocked at
+3–10 ms, and L4 passed at ~210 ms. Three scripted trusted-event drags
+(`Input.dispatchMouseEvent`, aimed with the oracle, smooth delayed re-aim; **not a
+person**) passed at 416–439 ms. The passive channel scored everything 0.42–0.67 and
+**vetoed nothing**: the Tier 4 result reproduced live.
 
-Two rules changed because of these runs:
+**Human-shaped drags.** The probe runs motor *models*, not people: drags bowed ±30 px
+and ±45 px with ~1.5 px tremor and a 180–260 ms delayed smooth re-aim, plus
+miss-pause-re-grab runs.
+
+Two rules changed earlier because of these models:
 - **Re-aim threshold raised from 6 px to 15 px.** At 6 px, with a walk-back to
   baseline, curvature alone timed 4 of 10 ±30 px drags as "too fast". The 15 px rule
   reports the crossing time itself, which overstates latency; that errs toward
@@ -142,22 +161,45 @@ Two rules changed because of these runs:
 - **Maximum-onset rule removed.** It rejected the miss-and-re-grab path.
 
 If a strongly curved drag hides the onset, the latency rule is skipped and noted. The
-piece still had to land on the moved slot.
+piece still has to land on the moved slot, ≥ 300 ms after the ack.
+
+### Participant study (what calibrates all of this)
+
+```
+run_demo.bat --log-trials                  # or: java ... DemoServer --log-trials
+# each person opens  http://127.0.0.1:8787/login.html?study=1&p=P01   (anonymous code)
+python demo/analyze_trials.py              # -> pass rates, distributions, calibrated floors
+```
+
+Study mode hides the verdict panel and loads a fresh puzzle after every sign-in. The
+server appends one line per trial to `demo/study_data/trials.jsonl`, which is
+git-ignored. Each line holds the participant code, both verdicts and the puzzle's
+raw server-clocked trace, and never the username, password or background trace.
+`analyze_trials.py` reports rates per participant (n = people), calibrates each
+floor on half the participants and reports it on the other half, following the
+Tier 5 lesson. Aim for 20+ people, with both mouse and trackpad users and some
+on a remote connection. Get whatever consent your institution requires. Edit
+`PerturbationPuzzle.Rules` by hand from its output. **Do not retrain the forest on
+study data.**
 
 **Caveats.**
-- **Every puzzle threshold is hand-set.** `PerturbationPuzzle.Rules` has not been
-  calibrated on any human sample.
+- **Every puzzle threshold is hand-set** until the study has run.
 - **Real-hand behaviour is unverified.** In particular, no one has checked whether
-  ordinary human background movement on this page trips the 0.87 veto. If it does,
-  that is the domain-shift failure documented under *Known behaviour*. Soften the
-  rule openly; don't hide it.
-- **L4 passing is the honest limit.** The puzzle doesn't yet check the *shape* of the
-  correction, and a bot that models human latency gets in. What the puzzle buys is
-  cost: the attacker must run a live closed-loop controller with a human latency
-  model, not replay a pre-planned path.
-- **Positions are still client-claimed.** Only the timing is server-owned. The
-  latency is measured over a localhost round trip, and over a real network, jitter
-  would blur the 100 ms floor.
+  ordinary human background movement on this page trips the 0.87 veto; the study
+  log measures exactly that. If it does, that is the domain-shift failure documented
+  under *Known behaviour*. Soften the rule openly; don't hide it.
+- **L4 passing is the honest limit.** What the puzzle buys is cost. The attacker
+  must run a live closed-loop controller with vision and a human latency model; it
+  can no longer replay a pre-planned path. Hiding the slot in an image adds a
+  perception step, not a wall.
+- **Positions are still client-claimed.** Only the timing is server-owned. Network
+  effects were measured on a simulated link. Real TCP/HTTP2 and browser scheduling
+  are untested, and jitter still blurs the 100 ms floor.
+- **`/puzzle/oracle` must not ship.** It returns 404 unless the server was started
+  with `--oracle`.
+- **No background movement means "no evidence" → HUMAN** on the passive side. A
+  silent bot has to beat only the puzzle. In the one study-mode test drag, a scripted
+  regular sine sweep in the background *was* vetoed (0.95).
 
 ---
 
@@ -181,8 +223,9 @@ the letters are never in the page as text; the prompt is an image too.
 ### Two channels, never one score
 
 **The forest is deliberately not applied to CAPTCHA traces.** Tier 3 measured
-that mistake: short goal-directed segments took zero-shot human FPR from 9.79% to
-32.8% and AUC from 0.53 to 0.36, because they sit even further outside DELBOT's
+that mistake: on the 5 held-out users, short goal-directed segments took zero-shot
+human FPR from 10.85% to 28.85% (7 features) and from 32.58% to 71.09% (14), with
+bot AUC at chance either way, because they sit even further outside DELBOT's
 long circle-drawing distribution. CAPTCHA hops are exactly that shape. So the
 challenge has its own scorer and its own thresholds, and the two channels are
 never averaged.

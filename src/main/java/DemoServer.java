@@ -44,11 +44,14 @@ import java.util.regex.Pattern;
  *                                        corroborated by the client trace
  *
  * Test login page (demo/login.html) -- moving puzzle (PerturbationPuzzle) + passive forest:
- * POST /puzzle/new                   -> start, slot, board size (never the jump)
- * POST /puzzle/move  {id,x,y}         -> server-clock stamped position; one reply carries the jump
- * POST /puzzle/drop  {id,x,y}         -> placed | miss | exhausted
- * POST /auth/login   {user,pass,puzzle,bg}
- *                                     -> both channels judged server-side, decision table, sign-in
+ * POST /puzzle/new                   -> start, board PNG + piece PNG (never the slot as a number)
+ * POST /puzzle/move  {id,seq,x,y,ack} -> server-clock stamped position; replies carry the jump
+ *                                        (ack token + moved board PNG) until the ack is echoed
+ * POST /puzzle/drop  {id,x,y,ack}     -> placed | miss | exhausted
+ * GET  /puzzle/oracle?id=             -> current slot; only with --oracle (probe affordance)
+ * POST /auth/login   {user,pass,puzzle,bg,participant?,sim?}
+ *                                     -> both channels judged server-side, decision table, sign-in;
+ *                                        with --log-trials, one line appended to demo/study_data/trials.jsonl
  *
  * The 18 features must be in Tier2Features.featureNames(AUGMENTED) order -- the
  * browser computes them with demo/features.js, which demo/parity.js proves is
@@ -63,11 +66,19 @@ public class DemoServer {
     private static Instances schema;
     private static int botIdx;
     private static double threshold;
+    private static boolean ORACLE = false;
+    private static boolean LOG_TRIALS = false;
+    private static final File TRIALS_FILE = new File(new File(DEMO_DIR, "study_data"), "trials.jsonl");
 
     public static void main(String[] args) throws Exception {
         // the CAPTCHA renders glyphs with AWT; never needs a display
         System.setProperty("java.awt.headless", "true");
-        int port = args.length > 0 ? Integer.parseInt(args[0]) : 8787;
+        int port = 8787;
+        for (String a : args) {
+            if (a.equals("--oracle")) ORACLE = true;
+            else if (a.equals("--log-trials")) LOG_TRIALS = true;
+            else port = Integer.parseInt(a);
+        }
 
         rf = (RandomForest) SerializationHelper.read(new File(MODEL_DIR, "rf.model").getPath());
         schema = new Instances(new BufferedReader(new FileReader(new File(MODEL_DIR, "schema.arff"))));
@@ -86,6 +97,8 @@ public class DemoServer {
 
         System.out.println("demo model  : " + schema.numAttributes() + " attrs, threshold P(bot) >= " + threshold);
         System.out.println("serving      : http://127.0.0.1:" + port + "/");
+        if (ORACLE) System.out.println("WARNING      : /puzzle/oracle is ON (hands out the slot) -- probes only, never a real deployment");
+        if (LOG_TRIALS) System.out.println("study log    : appending every sign-in to " + TRIALS_FILE.getPath());
         System.out.println("(Ctrl+C to stop)");
     }
 
@@ -128,10 +141,20 @@ public class DemoServer {
     private static void handlePuzzle(HttpExchange ex) throws IOException {
         cors(ex);
         if ("OPTIONS".equals(ex.getRequestMethod())) { ex.sendResponseHeaders(204, -1); ex.close(); return; }
-        if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
         String path = ex.getRequestURI().getPath();
-        String body = readBody(ex);
         try {
+            if (path.equals("/puzzle/oracle")) {
+                // SIMULATION AFFORDANCE, OFF unless the server was started with --oracle.
+                // Hands a probe the current slot so it can skip perception: it isolates
+                // the timing channel, exactly like /challenge/oracle. Never ship it.
+                if (!ORACLE) { send(ex, 404, "application/json", "{\"error\":\"oracle disabled (start DemoServer with --oracle)\"}"); return; }
+                PerturbationPuzzle.Puzzle p = PerturbationPuzzle.get(query(ex.getRequestURI().getRawQuery()).get("id"));
+                if (p == null) { send(ex, 404, "application/json", "{\"error\":\"unknown puzzle\"}"); return; }
+                send(ex, 200, "application/json", PerturbationPuzzle.oracleJson(p));
+                return;
+            }
+            if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
+            String body = readBody(ex);
             if (path.equals("/puzzle/new")) {
                 send(ex, 200, "application/json", PerturbationPuzzle.issueJson(PerturbationPuzzle.issue()));
                 return;
@@ -139,14 +162,15 @@ public class DemoServer {
             PerturbationPuzzle.Puzzle p = PerturbationPuzzle.get(jsonString(body, "id"));
             if (p == null) { send(ex, 404, "application/json", "{\"error\":\"unknown puzzle\"}"); return; }
             double x = jsonNumber(body, "x", Double.NaN), y = jsonNumber(body, "y", Double.NaN);
+            String ack = jsonString(body, "ack");
             switch (path) {
                 case "/puzzle/move":
                     if (Double.isNaN(x) || Double.isNaN(y)) { send(ex, 400, "application/json", "{\"error\":\"x,y required\"}"); return; }
-                    send(ex, 200, "application/json", PerturbationPuzzle.move(p, x, y));
+                    send(ex, 200, "application/json", PerturbationPuzzle.move(p, x, y, (long) jsonNumber(body, "seq", -1), ack));
                     return;
                 case "/puzzle/drop":
                     if (Double.isNaN(x) || Double.isNaN(y)) { send(ex, 400, "application/json", "{\"error\":\"x,y required\"}"); return; }
-                    send(ex, 200, "application/json", PerturbationPuzzle.drop(p, x, y));
+                    send(ex, 200, "application/json", PerturbationPuzzle.drop(p, x, y, ack));
                     return;
                 default:
                     send(ex, 404, "application/json", "{\"error\":\"no such endpoint\"}");
@@ -180,7 +204,8 @@ public class DemoServer {
         if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
         String body = readBody(ex);
         try {
-            PerturbationPuzzle.Verdict pv = PerturbationPuzzle.verify(PerturbationPuzzle.get(jsonString(body, "puzzle")));
+            PerturbationPuzzle.Puzzle puzzle = PerturbationPuzzle.get(jsonString(body, "puzzle"));
+            PerturbationPuzzle.Verdict pv = PerturbationPuzzle.verify(puzzle);
 
             // passive channel: split by segment id, then by the 3 s gap rule
             java.util.TreeMap<Integer, java.util.List<double[]>> bySeg = new java.util.TreeMap<>();
@@ -236,9 +261,35 @@ public class DemoServer {
                 sb.append(String.format(java.util.Locale.ROOT, "{\"score\":%.4f,\"points\":%d,\"ms\":%.0f}", c[0], (int) c[1], c[2]));
             }
             sb.append("]}}");
-            send(ex, 200, "application/json", sb.toString());
+            String response = sb.toString();
+            if (LOG_TRIALS) logTrial(body, response, puzzle);
+            send(ex, 200, "application/json", response);
         } catch (Exception e) {
             send(ex, 500, "application/json", "{\"error\":" + CaptchaChallenge.jsonStr(String.valueOf(e)) + "}");
+        }
+    }
+
+    /**
+     * One JSON line per sign-in, for the participant study (demo/analyze_trials.py).
+     * Stores the participant code, whether a bot sim produced it, both channels'
+     * verdicts and the puzzle's raw server-clocked trace. Never the username,
+     * password, or the background trace itself.
+     */
+    private static synchronized void logTrial(String body, String response, PerturbationPuzzle.Puzzle puzzle) {
+        String participant = jsonString(body, "participant");
+        if (participant == null || !participant.matches("[A-Za-z0-9_-]{1,32}")) participant = "";
+        int sim = (int) jsonNumber(body, "sim", 0);
+        String line = "{\"ts\":" + System.currentTimeMillis()
+                + ",\"participant\":\"" + participant + "\""
+                + ",\"sim\":" + sim
+                + ",\"result\":" + response
+                + ",\"trace\":" + PerturbationPuzzle.traceJson(puzzle) + "}\n";
+        try {
+            TRIALS_FILE.getParentFile().mkdirs();
+            Files.writeString(TRIALS_FILE.toPath(), line, StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            System.err.println("study log write failed: " + e);
         }
     }
 

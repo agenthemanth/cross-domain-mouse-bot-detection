@@ -44,10 +44,11 @@ diagrams. It is written for someone who is *not* a developer.
 10. [The two bug corrections (this belongs in the paper)](#10-the-two-bug-corrections-this-belongs-in-the-paper)
 11. [Results, tier by tier](#11-results-tier-by-tier)
 12. [The second channel — the sequential-reveal CAPTCHA](#12-the-second-channel--the-sequential-reveal-captcha)
+    - [12b. The perturbation-response puzzle (login page)](#12b-the-perturbation-response-puzzle-login-page)
 13. [The live demo](#13-the-live-demo)
 14. [Architecture diagrams](#14-architecture-diagrams)
 15. [Limitations / threats to validity](#15-limitations--threats-to-validity)
-16. [Related work — placeholders only, nothing verified](#16-related-work--placeholders-only-nothing-verified)
+16. [Related work — what is verified, what is not](#16-related-work--what-is-verified-what-is-not)
 17. [Conclusion](#17-conclusion)
 18. [Reproducibility appendix](#18-reproducibility-appendix)
 19. [Suggested paper skeleton](#19-suggested-paper-skeleton)
@@ -398,9 +399,14 @@ training: `mean_velocity` is the mean of a precomputed velocity field (about a
 derivatives while our DELBOT training uses plain first differences. **Only
 `num_points`, `duration_ms` and `path_efficiency` are directly comparable.**
 
-**Recommendation:** treat the Balabit pipeline as the paper's sound cross-dataset
-result. Either restrict the mightymerge check to those 3 columns, or drop
-mightymerge from the cross-dataset story and mention it only as a rough sanity check.
+**Decision (2026-09-24): mightymerge is DROPPED from the paper's cross-dataset
+claims.** Restricting it to the 3 comparable columns would need a new 3-feature
+model, and the frozen models are not being retrained. The Balabit pipeline is the
+paper's sound cross-dataset result. If mightymerge is mentioned at all, it is one
+sentence in Limitations ("a third, precomputed-feature corpus was not comparable
+feature-for-feature and was excluded"). The 5.28% / 3.92% figures in §11.0 and §20.1
+stay as a raw record and **must not appear in the abstract, results tables or
+conclusion**.
 
 ### 4.4 Click-fraud CSVs — not part of this study
 
@@ -1123,6 +1129,139 @@ attack-specific" conclusion the seven tiers reached, one level up.
 
 ---
 
+## 12b. The perturbation-response puzzle (login page)
+
+### 12b.1 Why it exists
+
+Tiers 4 and 7 were lost to **open-loop** bots, which plan a path in advance whose
+statistics look human. The CAPTCHA (§12) forces the attacker online, but a bot that
+sleeps a plausible delay still passes it. The puzzle asks for something an
+open-loop plan cannot have: a **reaction to a perturbation the bot could not know
+in advance**.
+
+This is the **double-step paradigm** from motor control (Prablanc & Martin 1992;
+§16). The target jumps mid-reach, and a person corrects after a visuomotor delay
+(early automatic responses appear at roughly 125–160 ms; Day & Lyon 2000).
+**The mechanism is borrowed. Do not claim it as new.**
+
+### 12b.2 The mechanic
+
+`/login.html` is a test sign-in page (`demo` / `letmein`). You drag a piece onto the
+outline of the same shape. The board is a **server-rendered PNG** with three decoy
+outlines, so the slot's coordinates are never sent to the client. Piece positions
+stream to `/puzzle/move`, sequence-numbered and several in flight, and each one is
+**stamped on the server clock** when it arrives. After a secret 20–35% of the course,
+a reply delivers a new board: the slot has jumped 60–85 px perpendicular to the
+course, and every decoy has shifted as well. The reply also carries a random
+**ack token**, which the client echoes on every later report.
+
+### 12b.3 The trust boundary, and a bug the measurement caught
+
+The first version timed the re-aim from when the server **sent** the jump. That
+counts the network round trip as reaction time. The old code was never run over a
+jittered link. Instead, the send-referenced rule was **recomputed** on the new
+trials' raw onsets (server-clocked from the send). By that rule an instant
+closed-loop bot (L3) passes **3/3 at ~120 ms and 3/3 at ~240 ms round trip**. At
+240 ms, two trials passed on onset and one was untimed and passed on its drop time.
+This is a lower bound for the old code, whose one-at-a-time client also sampled
+less often. The latency is now measured from the **arrival of the first
+ack**. The ack and the re-aim travel the same uplink, so the round trip cancels
+out. The asymmetry is deliberate. A client cannot echo the token before it has it,
+and echoing it late only makes its reaction look *faster*.
+
+A second loophole showed up while fixing the first. The sample that carries the ack
+had been counted as "before reaction", so a bot that re-aimed in that very message
+hid the correction inside the momentum baseline, and L3 passed at every link
+speed. The ack-carrying sample now counts as post-reaction.
+
+**What remains client-claimed:** positions. Only timing is server-owned.
+
+### 12b.4 Measured results
+
+These come from `login_channel_results.txt`. The probe reads the slot from the
+`--oracle` route, which gives every bot perfect perception for free and isolates
+the timing channel. The link is a **simulated** Gaussian delay per message, not a
+real network.
+
+| link (one-way) | L1 open-loop | L2 evasive open-loop | L3 instant closed-loop | L3, send-referenced rule *recomputed* on the same trials | L4 vision + 180–260 ms delay | human motor models |
+|---|---|---|---|---|---|---|
+| localhost | 0/3 pass | 0/3 | 0/3 | 0/3 | **3/3 pass** | 12/12 pass |
+| 20 ± 5 ms | 0/3 | 0/3 | 0/3 | 0/3 | **3/3** | 12/12 |
+| 60 ± 15 ms | 0/3 | 0/3 | 0/3 | **3/3 pass** | **3/3** | 12/12 |
+| 120 ± 35 ms | 0/3 | 0/3 | 0/3 | **3/3 pass** (2 on onset, 1 untimed) | **3/3** | 12/12 |
+
+In-browser (headless Chrome, 1400×1000), the in-page sims find the slot **by
+vision**: a white-box locator thresholds the board, takes connected components and
+matches them against the piece outline. L1 and L2 miss the moved slot. L3 re-aims
+3–10 ms after the ack and is blocked. L4 re-aims at ~210 ms and **passes**. The
+perception step costs **~11–28 ms per board read**. Three scripted trusted-event
+drags (`Input.dispatchMouseEvent`, aimed with the oracle, delayed smooth re-aim)
+passed, with net onsets of 416–439 ms. The passive channel scored every sim and
+every scripted drag between 0.42 and 0.67, under the 0.87 veto line. That is
+Tier 4 again: passive statistics are copyable.
+
+### 12b.5 What it buys, stated honestly
+
+The puzzle does **not** separate humans from bots. It separates *reactive
+controllers with a human-scale delay* from everything else. The attacker has to run
+a live, closed-loop controller with vision and a latency model, where before it
+could replay a plan. That is a cost increase of the same kind as §12.8, one level
+up. Hiding the slot in an image adds a perception step of tens of milliseconds, not
+a wall.
+
+### 12b.6 The participant study: what turns this into a result
+
+Every "human" number above comes from a model or a script. The puzzle's
+false-reject rate is **undefined** until people use it. The harness is built:
+
+1. Start `run_demo.bat --log-trials` (or `DemoServer --log-trials`).
+2. Each participant opens `/login.html?study=1&p=<code>`, using an anonymous code
+   such as P01. Study mode hides the verdict panel, so people do not adapt to it,
+   and loads a fresh puzzle after every sign-in. Ask for about 10 trials at normal
+   pace. Record device (mouse or trackpad) and network (local or remote) against the code.
+3. The server appends one line per trial to `demo/study_data/trials.jsonl`, which
+   is git-ignored. Each line holds the verdict, the passive score and the puzzle's
+   raw server-clocked trace, but **never the username, password or background
+   trace**.
+4. Run `python demo/analyze_trials.py`. It reports participant-level pass rates
+   (n = people, not trials) with Wilson intervals, the onset and ack→placed
+   distributions, why failures failed, and the passive channel's human false-veto
+   rate. It then **calibrates each floor on half the participants and reports it on
+   the other half**, the Tier-5 CALIB/REPORT discipline, because Tier 5 found that
+   an operating point slips 1.6–2× across users.
+
+**Minimum to report:** 20 or more participants, ideally a mix of mouse and trackpad
+and a few on a remote connection. Get whatever consent your institution requires
+before collecting data. Edit `PerturbationPuzzle.Rules` by hand, cite the analysis
+output, and **do not retrain the forest on study data**. If the passive veto
+misfires on real people, loosen or drop it openly (that is the Tier-1 domain shift).
+
+### 12b.7 Caveats (all must be in the paper)
+
+- **Rules are hand-set** until §12b.6 is done: `MIN_ONSET_MS` 100,
+  `MIN_JUMP_TO_DROP_MS` 300, `ONSET_PX` 15. Two of them were already changed once
+  against the author's own motor models (the onset threshold went from 6 to 15 px,
+  and the maximum-onset rule was removed). Say so.
+- **L4 passes.** The design raises cost; it is not a classifier guarantee.
+- **"Re-aim not timeable" skips the latency rule.** For a strongly curved drag, the
+  momentum extrapolation can absorb the correction. A bot that curves hard toward
+  the side the slot happens to jump to could, about half the time, avoid being
+  timed. It still needs ≥ 300 ms from ack to placement.
+- **Network results use a simulated link.** Real TCP, HTTP/2 multiplexing and
+  browser scheduling are untested. Jitter blurs the 100 ms floor: the gap between
+  the ack's uplink delay and the re-aim's uplink delay adds noise with roughly √2×
+  the link jitter.
+- **`/puzzle/oracle` must not ship.** It is off unless the server starts with
+  `--oracle`.
+- **A bot that sends no background movement gets "no evidence" → HUMAN from the
+  passive channel.** The veto only ever adds rejections; the puzzle is the only
+  channel a silent bot must beat. Requiring background evidence would reject
+  keyboard-only and touch users, so the choice needs the study data first.
+- **The white-box vision bot knows the renderer.** A black-box one would cost more
+  to build, but hiding the slot in an image is still not the security property.
+
+---
+
 ## 13. The live demo
 
 `DemoServer` (Java `com.sun.net.httpserver`) on `127.0.0.1:8787` serves the frozen
@@ -1353,12 +1492,16 @@ establishes credibility, and a reviewer will find every one of these anyway.
    FPR slippage between disjoint user sets. Practical advice: calibrate at roughly
    half the FPR you actually need. This is also why the demo's 0.87 / "0.9% FPR"
    pair is optimistic.
-5. **Latency is asserted, never measured.** The real-time claim has not been timed
-   for a 100-tree forest plus 20-feature extraction. **Either measure it before
-   submission (it is a cheap experiment and would strengthen the paper) or remove
-   every real-time claim from the text.**
-6. **mightymerge is confounded** (§4.3). Restrict it to `num_points`,
-   `duration_ms`, `path_efficiency`, or drop it from the cross-dataset story.
+5. **Latency: measured server-side only** (`LatencyBench`, `latency_results.txt`).
+   Feature extraction plus a 100-tree forest score on the frozen 18-feature model
+   takes **0.10 ms per chunk at p50, 0.22 ms at p95 and 0.78 ms at p99** over 25
+   real held-out Balabit chunks (~98 points each) × 400 rounds. That is one thread,
+   warm JIT, Java 25, on the author's 8-thread Windows laptop. The worst single call
+   was 33 ms, a JIT/GC outlier. **Not measured:** network, the browser's JS feature
+   extraction, or a cold start. Claim "sub-millisecond server-side scoring", never
+   "real-time end to end".
+6. **mightymerge is confounded** (§4.3) and is **excluded** from the paper's
+   cross-dataset claims; say so in one sentence.
 7. **Raw maximum velocity ~1277 px/ms is unphysical** — the 1 ms Δt floor is still
    too coarse for large position jumps. A known, unfixed defect.
 8. **The CAPTCHA channel's thresholds are uncalibrated**, a jittered human-paced bot
@@ -1372,10 +1515,15 @@ establishes credibility, and a reviewer will find every one of these anyway.
     than by an explicit rule (§4.1).
 11. **DELBOT's provenance is not documented in this repository.** Establish it, or
     describe the corpus honestly as in-house.
+12. **The perturbation puzzle (§12b) has no human calibration yet.** Its rules are
+    hand-set; its "human" rows are motor models and scripted trusted-event drags,
+    not people. Run the participant study (§12b.6) before quoting any pass rate. A
+    vision bot that waits a human-like delay (L4) passes by design, and network
+    effects are measured on a simulated link, not a real one.
 
 ---
 
-## 16. Related work — placeholders only, nothing verified
+## 16. Related work — what is verified, what is not
 
 > **⚠️ STOP. Read this before writing your related-work section.**
 >
@@ -1391,8 +1539,26 @@ establishes credibility, and a reviewer will find every one of these anyway.
 > bibliography entry is the single worst thing that can appear in a student's
 > conference submission.
 
-Here are the claims you probably *want* to make, written as placeholders. Fill each
-one in only after reading the source:
+**Bibliographic check, 2026-09-24.** The entries marked ✅ below were looked up
+against their publishers or DBLP. The paper exists with these authors, venue and
+year, and the abstract matches the claim written next to it. **That is not the same
+as reading the paper.** Any *number* you quote from one of them still has to be
+confirmed in the full text.
+
+| ✅ | Reference | What it supports |
+|---|---|---|
+| ✅ | C. Iliou, T. Kostoulas, T. Tsikrika, V. Katos, S. Vrochidis, I. Kompatsiaris. *Detection of Advanced Web Bots by Combining Web Logs with Mouse Behavioural Biometrics.* Digital Threats: Research and Practice, 2021. doi:10.1145/3447815 | prior bot detection with mouse dynamics, combined with web logs |
+| ✅ | C. Iliou et al. *Towards a framework for detecting advanced Web bots.* ARES 2019. doi:10.1145/3339252.3339267 | the earlier framework paper by the same group |
+| ✅ | A. Wei, Y. Zhao, Z. Cai. *A Deep Learning Approach to Web Bot Detection Using Mouse Behavioral Biometrics.* CCBR 2019, LNCS, pp. 388–395. doi:10.1007/978-3-030-31456-9_43 | mouse movements rendered as images → CNN (the "trajectory-image CNN" future-work pointer) |
+| ✅ | A. Acien, A. Morales, J. Fierrez, R. Vera-Rodriguez. *BeCAPTCHA-Mouse: Synthetic mouse trajectories and improved bot detection.* Pattern Recognition 127, 108643, 2022 | synthetic human-like trajectories (function-based and GAN) for training bot detectors; closest prior work to our synthetic-bot training |
+| ✅ | C. Prablanc, O. Martin. *Automatic control during hand reaching at undetected two-dimensional target displacements.* J. Neurophysiology 67:455–469, 1992 | the double-step paradigm the puzzle borrows (§12b) |
+| ✅ | B. L. Day, I. N. Lyon. *Voluntary modification of automatic arm movements evoked by motion of a visual target.* Exp. Brain Research 130:159–168, 2000 | correction latency: an early automatic response at ~125–160 ms after a target shift, which is where the 100 ms floor comes from |
+
+Still **unverified**: the "RF AUC ≈ 0.72 / EER 33% vs deep ≈ 0.98" within-Balabit
+comparison below. No source for it has been found.
+
+Here are the claims you probably *want* to make. Fill each one in only after
+reading the source:
 
 - `[TO VERIFY]` **Mouse dynamics is established for user authentication.** Balabit's
   own challenge is the standard benchmark. → cite the Balabit dataset (§4.2 — that
@@ -1404,10 +1570,16 @@ one in only after reading the source:
   sequence models. **Confirm these numbers in the source papers before writing them
   down**, and if you cannot, either drop the numbers and make the qualitative claim,
   or drop the sentence.
-- `[TO VERIFY]` **Trajectory-image CNNs are a promising alternative representation.**
-  The notes attribute this to Wei et al. 2019 — **flagged UNVERIFIED**.
-- `[TO VERIFY]` **Prior bot-detection work using mouse dynamics.** The notes cite
-  Iliou et al. 2021 (two entries) — **both flagged UNVERIFIED**.
+- ✅ **Trajectory-image CNNs are a promising alternative representation** —
+  Wei, Zhao & Cai 2019 (table above). The existence and the method are verified;
+  quote no accuracy figure without reading it.
+- ✅ **Prior bot-detection work using mouse dynamics** — Iliou et al. 2019 and 2021,
+  and BeCAPTCHA-Mouse (table above).
+- **Do not claim the puzzle's mechanism is new.** It is the double-step paradigm
+  (Prablanc & Martin 1992) repurposed as a challenge. What you can claim is the
+  engineering: server-clocked, ack-referenced latency that is invariant to network
+  round trip. Before calling even that new, search for "interactive CAPTCHA",
+  "moving-target CAPTCHA" and "behavioural CAPTCHA", and cite what you find.
 - ✅ **The genuine gap you can state without any citation risk:** *no paper we could
   find runs this exact experiment — hand-crafted-feature RF trained on one mouse
   dataset, bot detection tested on another.* Phrase it as "to the best of our
@@ -1484,6 +1656,9 @@ java -Xmx2g -cp "target\classes;M\...\weka-stable-3.8.6.jar;M\...\bounce-0.18.ja
 | Tier 6 | `Tier6FeatureProbe` | — | `tier6_feature_probe_results.txt` |
 | Tier 7 | `Tier7ArmsRaceEval` | — | `tier7_arms_race_results.txt` |
 | CAPTCHA channel | `python demo/attack_probe.py <port>` | port | `captcha_channel_results.txt` |
+| Perturbation puzzle | `DemoServer <port> --oracle`, then `python demo/login_probe.py <port>` | port | `login_channel_results.txt` |
+| Latency (§15.5) | `LatencyBench` | rounds (default 400) | `latency_results.txt` |
+| Participant study | `DemoServer --log-trials`, people use `/login.html?study=1&p=<code>`, then `python demo/analyze_trials.py` | — | `demo/study_data/trials.jsonl` (git-ignored) |
 
 **Demo:**
 
@@ -1522,7 +1697,7 @@ A mapping from this document to a typical 8–10 page conference paper.
 | 4 | **Method** — segmentation, the 3 feature sets, the classifier, **the matched-twin design**, the two bug corrections | 1.5 | §5, §6, §7, §8, §10 |
 | 5 | **Experimental design** — splits, CALIB/REPORT, metrics, determinism | 0.5 | §9 |
 | 6 | **Results** — the seven tiers, one subsection each | 2.5 | §11 |
-| 7 | **A two-channel system** — the reject option and the CAPTCHA | 1 | §12 |
+| 7 | **Active channels** — the reject option, the CAPTCHA, and the perturbation puzzle (with the participant study) | 1–1.5 | §12, §12b |
 | 8 | **Limitations** | 0.75 | §15 |
 | 9 | **Conclusion & future work** | 0.5 | §17 |
 | — | Figures 1–5 | inline | §14 |
@@ -1540,9 +1715,9 @@ A mapping from this document to a typical 8–10 page conference paper.
 
 **Two things worth doing before submission, in priority order:**
 
-1. **Measure the latency** (§15 item 5). It is a cheap experiment and it removes an
-   unsupported claim.
-2. **Verify or delete every citation** (§16). Non-negotiable.
+1. **Run the participant study** (§12b.6). Without it the puzzle is a demo, not a
+   result, and its FPR is undefined.
+2. **Read the full text of every ✅ citation you quote a number from** (§16).
 
 ---
 

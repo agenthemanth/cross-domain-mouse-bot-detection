@@ -62,7 +62,7 @@ updated in this pass -- update it deliberately against the post-rescale result
 files and Tier 5/6 before it feeds the paper.
 
 ### Still open (unchanged by this)
-- Raw max velocity ~1277 px/ms (1 ms dt floor too coarse for large jumps) — a
+- Raw max veloc/,ity ~1277 px/ms (1 ms dt floor too coarse for large jumps) — a
   deliberate, announced Tier-1 re-baseline, not done here.
 - No GAN / captured-bot trajectories.
 - Adversarial bot matches only ~10/18 features.

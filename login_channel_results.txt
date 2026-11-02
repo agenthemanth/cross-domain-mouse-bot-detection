@@ -1,0 +1,122 @@
+# regenerated 2026-09-24 -- DemoServer 8791 --oracle; python demo/login_probe.py 8791
+# ack-based onset + pipelined, sequence-numbered streaming + board PNG with decoys; simulated links (model, not real networks)
+# "L3 if raw rule" = the old send-referenced onset rule RECOMPUTED on these trials (the old code was not rerun). It counts
+# timed onsets only; the untimed mobile L3 trial (t2) would also pass the old rule on its drop time, so read it as >= 3 / >= 3.
+
+probe against http://127.0.0.1:8791  (passive channel empty -> puzzle isolated; slot read from the oracle)
+columns: ack = jump sent -> ack received; raw = onset measured from the jump send (old rule);
+         net = onset measured from the ack (the rule now used); raw-rule = what the old rule would say
+
+=== localhost: one-way 0 ms +- 0 ms  (RTT ~0 ms) ===
+  L1 scripted, open-loop           t0  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L1 scripted, open-loop           t1  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L1 scripted, open-loop           t2  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t0  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t1  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t2  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L3 closed-loop, instant          t0  drop=placed    BOT    ack=  18 raw=  18 net=   0 ack->drop=  496 stale=0  raw-rule FAIL re-aimed 0 ms after receiving the moved board (server clock)
+  L3 closed-loop, instant          t1  drop=placed    BOT    ack=  19 raw=  19 net=   0 ack->drop=  512 stale=0  raw-rule FAIL re-aimed 0 ms after receiving the moved board (server clock)
+  L3 closed-loop, instant          t2  drop=placed    BOT    ack=  18 raw=  18 net=   0 ack->drop=  495 stale=0  raw-rule FAIL re-aimed 0 ms after receiving the moved board (server clock)
+  L4 closed-loop, 180-260 ms delay t0  drop=placed    HUMAN  ack=  18 raw= 222 net= 203 ack->drop=  512 stale=0  raw-rule PASS no flag
+  L4 closed-loop, 180-260 ms delay t1  drop=placed    HUMAN  ack=  19 raw= 240 net= 221 ack->drop=  497 stale=0  raw-rule PASS no flag
+  L4 closed-loop, 180-260 ms delay t2  drop=placed    HUMAN  ack=  35 raw= 271 net= 236 ack->drop=  497 stale=0  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t0  drop=placed    HUMAN  ack=  17 raw= 507 net= 491 ack->drop=  733 stale=0  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t1  drop=placed    HUMAN  ack=  18 raw= 407 net= 389 ack->drop=  681 stale=0  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t2  drop=placed    HUMAN  ack=  16 raw= 371 net= 354 ack->drop=  749 stale=0  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t3  drop=placed    HUMAN  ack=  17 raw= 409 net= 393 ack->drop=  686 stale=0  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t4  drop=placed    HUMAN  ack=  17 raw= 407 net= 390 ack->drop=  683 stale=0  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t5  drop=placed    HUMAN  ack=  16 raw= 339 net= 322 ack->drop=  717 stale=0  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t0  drop=placed    HUMAN  ack=  17 raw= 588 net= 572 ack->drop=  746 stale=0  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t1  drop=placed    HUMAN  ack=  17 raw= 289 net= 273 ack->drop=  684 stale=0  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t2  drop=placed    HUMAN  ack=  17 raw= 306 net= 289 ack->drop=  750 stale=0  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t3  drop=placed    HUMAN  ack=  17 raw=   - net=   - ack->drop=  751 stale=0                no flag
+  model: miss, pause 3 s, re-grab  t0  drop=placed    HUMAN  ack=  17 raw=3599 net=3583 ack->drop= 4031 stale=0  raw-rule PASS no flag
+  model: miss, pause 3 s, re-grab  t1  drop=placed    HUMAN  ack=  17 raw=3569 net=3552 ack->drop= 4047 stale=0  raw-rule PASS no flag
+
+=== broadband: one-way 20 ms +- 5 ms  (RTT ~40 ms) ===
+  L1 scripted, open-loop           t0  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L1 scripted, open-loop           t1  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L1 scripted, open-loop           t2  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=1                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t0  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t1  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t2  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=0                piece never placed on the MOVED slot -- consistent with an o
+  L3 closed-loop, instant          t0  drop=placed    BOT    ack=  52 raw=  52 net=   0 ack->drop=  456 stale=1  raw-rule FAIL re-aimed 0 ms after receiving the moved board (server clock)
+  L3 closed-loop, instant          t1  drop=placed    BOT    ack=  57 raw=  57 net=   0 ack->drop=  501 stale=0  raw-rule FAIL re-aimed 0 ms after receiving the moved board (server clock)
+  L3 closed-loop, instant          t2  drop=placed    BOT    ack=  53 raw=  53 net=   0 ack->drop=  499 stale=0  raw-rule FAIL re-aimed 0 ms after receiving the moved board (server clock)
+  L4 closed-loop, 180-260 ms delay t0  drop=placed    HUMAN  ack=  43 raw= 260 net= 217 ack->drop=  478 stale=0  raw-rule PASS no flag
+  L4 closed-loop, 180-260 ms delay t1  drop=placed    HUMAN  ack=  50 raw= 270 net= 220 ack->drop=  467 stale=0  raw-rule PASS no flag
+  L4 closed-loop, 180-260 ms delay t2  drop=placed    HUMAN  ack=  57 raw= 305 net= 248 ack->drop=  466 stale=1  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t0  drop=placed    HUMAN  ack=  64 raw= 429 net= 365 ack->drop=  751 stale=0  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t1  drop=placed    HUMAN  ack=  53 raw= 479 net= 427 ack->drop=  688 stale=0  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t2  drop=placed    HUMAN  ack=  50 raw= 537 net= 487 ack->drop=  738 stale=1  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t3  drop=placed    HUMAN  ack=  36 raw= 350 net= 314 ack->drop=  698 stale=1  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t4  drop=placed    HUMAN  ack=  46 raw= 507 net= 461 ack->drop=  721 stale=1  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t5  drop=placed    HUMAN  ack=  60 raw= 555 net= 495 ack->drop=  714 stale=1  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t0  drop=placed    HUMAN  ack=  48 raw= 248 net= 200 ack->drop=  751 stale=0  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t1  drop=placed    HUMAN  ack=  56 raw=   - net=   - ack->drop=  671 stale=0                no flag
+  model: arc +-45px, tremor, delay t2  drop=placed    HUMAN  ack=  55 raw= 327 net= 272 ack->drop=  765 stale=0  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t3  drop=placed    HUMAN  ack=  66 raw= 399 net= 333 ack->drop=  758 stale=1  raw-rule PASS no flag
+  model: miss, pause 3 s, re-grab  t0  drop=placed    HUMAN  ack=  49 raw=3665 net=3616 ack->drop= 4077 stale=1  raw-rule PASS no flag
+  model: miss, pause 3 s, re-grab  t1  drop=placed    HUMAN  ack=  60 raw=3660 net=3600 ack->drop= 4021 stale=2  raw-rule PASS no flag
+
+=== wan: one-way 60 ms +- 15 ms  (RTT ~120 ms) ===
+  L1 scripted, open-loop           t0  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=7                piece never placed on the MOVED slot -- consistent with an o
+  L1 scripted, open-loop           t1  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=3                piece never placed on the MOVED slot -- consistent with an o
+  L1 scripted, open-loop           t2  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=10               piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t0  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=5                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t1  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=4                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t2  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=3                piece never placed on the MOVED slot -- consistent with an o
+  L3 closed-loop, instant          t0  drop=placed    BOT    ack= 137 raw= 137 net=   0 ack->drop=  453 stale=6  raw-rule PASS re-aimed 0 ms after receiving the moved board (server clock)
+  L3 closed-loop, instant          t1  drop=placed    BOT    ack= 132 raw= 132 net=   0 ack->drop=  520 stale=7  raw-rule PASS re-aimed 0 ms after receiving the moved board (server clock)
+  L3 closed-loop, instant          t2  drop=placed    BOT    ack= 126 raw= 126 net=   0 ack->drop=  448 stale=8  raw-rule PASS re-aimed 0 ms after receiving the moved board (server clock)
+  L4 closed-loop, 180-260 ms delay t0  drop=placed    HUMAN  ack= 141 raw= 347 net= 206 ack->drop=  409 stale=4  raw-rule PASS no flag
+  L4 closed-loop, 180-260 ms delay t1  drop=placed    HUMAN  ack= 123 raw= 377 net= 253 ack->drop=  458 stale=8  raw-rule PASS no flag
+  L4 closed-loop, 180-260 ms delay t2  drop=placed    HUMAN  ack= 140 raw= 357 net= 217 ack->drop=  502 stale=6  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t0  drop=placed    HUMAN  ack= 123 raw= 475 net= 352 ack->drop=  860 stale=11 raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t1  drop=placed    HUMAN  ack= 104 raw= 384 net= 280 ack->drop=  788 stale=13 raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t2  drop=placed    HUMAN  ack= 143 raw= 480 net= 337 ack->drop=  848 stale=9  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t3  drop=placed    HUMAN  ack= 151 raw= 461 net= 310 ack->drop=  853 stale=12 raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t4  drop=placed    HUMAN  ack= 102 raw= 512 net= 410 ack->drop=  786 stale=10 raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t5  drop=placed    HUMAN  ack= 103 raw= 327 net= 224 ack->drop=  830 stale=10 raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t0  drop=placed    HUMAN  ack= 141 raw= 286 net= 145 ack->drop=  852 stale=9  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t1  drop=placed    HUMAN  ack=  92 raw= 330 net= 238 ack->drop=  803 stale=9  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t2  drop=placed    HUMAN  ack= 102 raw= 457 net= 355 ack->drop=  837 stale=11 raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t3  drop=placed    HUMAN  ack= 151 raw= 736 net= 585 ack->drop=  848 stale=9  raw-rule PASS no flag
+  model: miss, pause 3 s, re-grab  t0  drop=placed    HUMAN  ack= 139 raw=3829 net=3690 ack->drop= 4214 stale=12 raw-rule PASS no flag
+  model: miss, pause 3 s, re-grab  t1  drop=placed    HUMAN  ack= 142 raw=3872 net=3730 ack->drop= 4335 stale=12 raw-rule PASS no flag
+
+=== mobile: one-way 120 ms +- 35 ms  (RTT ~240 ms) ===
+  L1 scripted, open-loop           t0  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=5                piece never placed on the MOVED slot -- consistent with an o
+  L1 scripted, open-loop           t1  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=3                piece never placed on the MOVED slot -- consistent with an o
+  L1 scripted, open-loop           t2  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=7                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t0  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=9                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t1  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=8                piece never placed on the MOVED slot -- consistent with an o
+  L2 evasive, open-loop            t2  drop=miss      BOT    ack=   - raw=   - net=   - ack->drop=    - stale=6                piece never placed on the MOVED slot -- consistent with an o
+  L3 closed-loop, instant          t0  drop=placed    BOT    ack= 253 raw= 253 net=   0 ack->drop=  446 stale=3  raw-rule PASS re-aimed 0 ms after receiving the moved board (server clock)
+  L3 closed-loop, instant          t1  drop=placed    BOT    ack= 262 raw= 314 net=  52 ack->drop=  457 stale=4  raw-rule PASS re-aimed 52 ms after receiving the moved board (server clock
+  L3 closed-loop, instant          t2  drop=placed    BOT    ack= 308 raw=   - net=   - ack->drop=  222 stale=7                placed 222 ms after receiving the moved board (server clock)
+  L4 closed-loop, 180-260 ms delay t0  drop=placed    HUMAN  ack= 283 raw= 692 net= 409 ack->drop=  409 stale=4  raw-rule PASS no flag
+  L4 closed-loop, 180-260 ms delay t1  drop=placed    HUMAN  ack= 247 raw= 667 net= 420 ack->drop=  420 stale=4  raw-rule PASS no flag
+  L4 closed-loop, 180-260 ms delay t2  drop=placed    HUMAN  ack= 209 raw= 525 net= 316 ack->drop=  623 stale=5  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t0  drop=placed    HUMAN  ack= 177 raw= 624 net= 448 ack->drop= 1061 stale=10 raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t1  drop=placed    HUMAN  ack= 255 raw= 624 net= 370 ack->drop=  951 stale=8  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t2  drop=placed    HUMAN  ack= 229 raw= 754 net= 526 ack->drop= 1028 stale=8  raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t3  drop=placed    HUMAN  ack= 253 raw= 805 net= 552 ack->drop=  865 stale=12 raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t4  drop=placed    HUMAN  ack= 187 raw= 467 net= 280 ack->drop=  950 stale=12 raw-rule PASS no flag
+  model: arc +-30px, tremor, delay t5  drop=placed    HUMAN  ack= 238 raw= 449 net= 211 ack->drop=  910 stale=10 raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t0  drop=placed    HUMAN  ack= 168 raw= 619 net= 450 ack->drop= 1101 stale=9  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t1  drop=placed    HUMAN  ack= 224 raw= 486 net= 262 ack->drop=  873 stale=9  raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t2  drop=placed    HUMAN  ack= 208 raw= 931 net= 723 ack->drop= 1044 stale=13 raw-rule PASS no flag
+  model: arc +-45px, tremor, delay t3  drop=placed    HUMAN  ack= 279 raw= 896 net= 617 ack->drop=  895 stale=9  raw-rule PASS no flag
+  model: miss, pause 3 s, re-grab  t0  drop=placed    HUMAN  ack= 210 raw=4127 net=3917 ack->drop= 4473 stale=11 raw-rule PASS no flag
+  model: miss, pause 3 s, re-grab  t1  drop=placed    HUMAN  ack= 185 raw=3967 net=3782 ack->drop= 4444 stale=13 raw-rule PASS no flag
+
+unsolved puzzle  -> BOT: piece never placed
+replayed puzzle  -> BOT: puzzle already used -- replay refused
+
+SUMMARY (passes out of 3 bot trials; human models passed / run)
+  profile     L1  L2  L3  L3 if raw rule  L4  human models
+  localhost    0   0   0               0   3  12/12
+  broadband    0   0   0               0   3  12/12
+  wan          0   0   0               3   3  12/12
+  mobile       0   0   0               2   3  12/12

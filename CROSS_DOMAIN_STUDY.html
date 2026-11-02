@@ -170,13 +170,14 @@
     <strong>Why J48 stays:</strong> an earlier interpretable-baseline run caught a
     data-leakage bug that the Random Forest had hidden.</p>
   <p>The mightymerge set has no raw x/y, so 3 of its 7 features are computed differently than
-    in DELBOT training — it is a sanity check, not the project's cross-dataset result. Balabit
-    is the sound cross-domain false-positive number. No cited paper runs the exact experiment
-    (hand-crafted RF trained on one mouse dataset, bot detection tested on another); even for
-    the easier within-dataset Balabit <em>authentication</em> task a hand-crafted-feature RF
-    reaches only AUC ~0.72 / EER ~33% against ~0.98 for deep sequence models. Several
-    supporting citations (Iliou et al. ×2, Wei et al.) remain unverified against the source
-    papers and are flagged as such in the manuscript notes.</p>
+    in DELBOT training. It is <b>excluded from the paper's cross-dataset claims</b> (decided
+    2026-09-24; its figures above are kept as a record only). Balabit is the sound cross-domain
+    false-positive number. To our knowledge, no paper runs this exact experiment:
+    a hand-crafted RF trained on one mouse dataset, with bot detection tested on another. An
+    earlier note here gave within-Balabit authentication figures (RF AUC ~0.72 / EER ~33% vs
+    ~0.98 for deep models). <b>They have no verified source and are withdrawn.</b> Iliou et al.
+    (2019, 2021) and Wei et al. (2019) were checked bibliographically on 2026-09-24. They exist
+    and their abstracts match, but no number from them has yet been checked in the full text.</p>
   <span class="verdict v-warn">Early headline numbers were artefacts — corrected FPR ~5–10%</span>
 </section>
 
@@ -406,6 +407,40 @@
   <span class="verdict v-warn">Working — pending real-browser verification</span>
 </section>
 
+<section class="tier">
+  <div class="tier-head"><span class="tno">Puzzle</span><h2>Perturbation-response puzzle</h2></div>
+  <p class="q">Can an active challenge catch what Tiers 4 and 7 could not: a bot that replays a pre-planned, human-looking path?</p>
+  <p class="setup"><span class="m">PerturbationPuzzle</span> on <span class="m">/login.html</span>: a drag-to-slot
+    puzzle whose slot jumps mid-drag at a secret point. This is the double-step paradigm of
+    motor control (Prablanc &amp; Martin 1992), borrowed, not new. The board is a server-rendered
+    PNG with 3 decoys, so the slot is never sent as a number. Positions are stamped on the server
+    clock. Re-aim latency is measured from the arrival of an <b>ack token</b> that came with the
+    moved board, so network round trip is not counted as reaction. Probe:
+    <span class="m">login_probe.py</span> with the <span class="m">--oracle</span> route (perfect
+    perception, timing isolated) over simulated links. Results in
+    <span class="m">login_channel_results.txt</span>.</p>
+  <div class="tablewrap"><table>
+    <caption>Passes out of 3 trials per rung; human motor models (not people) passed / run</caption>
+    <thead><tr><th>one-way link</th><th>L1 open-loop</th><th>L2 evasive</th><th>L3 instant</th><th>L3, send-referenced rule recomputed</th><th>L4 +180–260 ms</th><th>human models</th></tr></thead>
+    <tbody>
+      <tr><td>localhost</td><td>0</td><td>0</td><td>0</td><td>0</td><td class="bad">3</td><td>12/12</td></tr>
+      <tr><td>20 ± 5 ms</td><td>0</td><td>0</td><td>0</td><td>0</td><td class="bad">3</td><td>12/12</td></tr>
+      <tr><td>60 ± 15 ms</td><td>0</td><td>0</td><td>0</td><td class="bad">3</td><td class="bad">3</td><td>12/12</td></tr>
+      <tr><td>120 ± 35 ms</td><td>0</td><td>0</td><td>0</td><td class="bad">3</td><td class="bad">3</td><td>12/12</td></tr>
+    </tbody>
+  </table></div>
+  <p>The old rule timed the re-aim from when the jump was sent. Recomputed on the same trials'
+    raw onsets (the old code was not rerun), it lets an instant bot through on all 6 trials once
+    round trip exceeds ~100 ms. That is a lower bound. The ack-referenced rule blocks it 12/12. In headless Chrome, the in-page bots find the slot by vision (~11–28 ms per
+    board read). L3 was blocked at 3–10 ms and L4 passed at ~210 ms. The passive forest scored
+    every sim 0.42–0.67 and vetoed none of them, which is the Tier-4 result live.</p>
+  <div class="note"><strong>Not yet a result:</strong> every "human" row is a motor model or a
+    scripted drag. The rules are hand-set, and the study harness
+    (<span class="m">--log-trials</span>, <span class="m">?study=1</span>,
+    <span class="m">analyze_trials.py</span>) is built but has not been run on people. L4 passes by design.</div>
+  <span class="verdict v-warn">Raises attack cost; human false-reject rate unmeasured</span>
+</section>
+
 <section class="closing">
   <h2>The race, in seven moves</h2>
   <ol class="race">
@@ -438,9 +473,11 @@
     <dd>The evasive bots match a subset of features by construction; a bot that also
       matched accel/jerk ordering and curvature — or hit the human roughness band exactly
       — would push detection back toward chance.</dd>
-    <dt>Latency is asserted, not measured</dt>
-    <dd>The sub-millisecond real-time claim has not been timed for the 100-tree forest
-      plus 20-feature extraction.</dd>
+    <dt>Latency: measured server-side only</dt>
+    <dd><span class="m">LatencyBench</span> on the frozen 18-feature demo model: feature extraction
+      plus a 100-tree forest score takes 0.10 ms at p50 and 0.78 ms at p99 per chunk (25 real
+      Balabit chunks × 400 rounds, one thread, warm JIT; worst 33 ms). Network, browser-side
+      extraction and cold start are not measured.</dd>
   </dl>
 
   <p class="foot">DELBOT + Balabit · Java 17 / Weka 3.8.6 · deterministic (RF seed 1,

@@ -72,7 +72,8 @@ import javax.imageio.ImageIO;
  * ----------------------------------
  * The frozen AUGMENTED-18 model is NOT applied to these traces. Tier 3 measured
  * that exact mistake: short goal-directed segments (median 1.6 s / 11 pts) took
- * zero-shot human FPR from 9.85% to 32.8% and AUC from 0.53 to 0.36, because
+ * zero-shot human FPR on the 5 held-out users from 10.85% to 28.85% (7 features)
+ * and from 32.58% to 71.09% (14), with bot AUC at chance either way, because
  * they sit even further outside DELBOT's long circle-drawing distribution.
  * CAPTCHA hops are that shape. So this is a SECOND, INDEPENDENT channel with its
  * own scorer and its own thresholds; the two are never averaged into one number.

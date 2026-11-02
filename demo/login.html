@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test Portal — sign in</title>
+<style>
+  :root{
+    --bg:#f3f4f7; --card:#ffffff; --ink:#15181f; --ink-2:#4b5263; --ink-3:#8a90a0;
+    --line:#dfe2ea; --line-2:#c9cdd8; --accent:#2f5bea; --accent-ink:#ffffff;
+    --human:#11875d; --human-bg:#e4f5ee; --bot:#c43b2b; --bot-bg:#fbe9e6;
+    --warn:#9a6700; --warn-bg:#fff4d6;
+    --r:12px;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono",SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:var(--sans);color:var(--ink);background:var(--bg);line-height:1.5;
+    -webkit-font-smoothing:antialiased}
+  a{color:var(--accent)}
+
+  .topbar{display:flex;align-items:center;gap:12px;padding:14px 24px;background:var(--card);
+    border-bottom:1px solid var(--line)}
+  .logo{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center;
+    color:#fff;font-weight:700;font-size:14px}
+  .brand{font-weight:600;letter-spacing:-.01em}
+  .topbar .back{margin-left:auto;font-size:13px}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;
+    display:grid;grid-template-columns:minmax(0,600px) minmax(0,1fr);gap:24px;align-items:start}
+  @media (max-width:1020px){.wrap{grid-template-columns:1fr}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:28px}
+  h1{font-size:22px;letter-spacing:-.015em;margin-bottom:4px}
+  .lede{color:var(--ink-2);font-size:14px;margin-bottom:22px}
+  label.f{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+  input.t{width:100%;font:inherit;font-size:15px;padding:10px 12px;border:1px solid var(--line-2);
+    border-radius:8px;background:#fff;color:var(--ink)}
+  input.t:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+  .creds{font-size:12.5px;color:var(--ink-3);margin-top:6px}
+  .creds code{font-family:var(--mono);background:var(--bg);padding:1px 5px;border-radius:4px;color:var(--ink-2)}
+
+  .ptitle{display:flex;align-items:baseline;justify-content:space-between;margin:22px 0 8px}
+  .ptitle b{font-size:13px}
+  .ptitle span{font-size:12px;color:var(--ink-3)}
+  .pboard{position:relative;width:100%;aspect-ratio:520/240;border:1px solid var(--line-2);border-radius:10px;
+    background:#fafbfd center/100% 100% no-repeat;
+    overflow:hidden;touch-action:none;user-select:none}
+  .piece{position:absolute;transform:translate(-50%,-50%);background:center/contain no-repeat;
+    filter:drop-shadow(0 5px 7px rgba(47,91,234,.45));cursor:grab}
+  .piece.dragging{cursor:grabbing;filter:drop-shadow(0 9px 11px rgba(47,91,234,.55))}
+  .pboard.placed .piece{filter:hue-rotate(-68deg) drop-shadow(0 0 0 transparent);cursor:default}
+  .studybar{display:none;margin:0 0 16px;padding:10px 12px;border-radius:8px;background:var(--warn-bg);
+    color:var(--ink);font-size:13px}
+  body.study .studybar{display:block}
+  body.study .side{display:none}
+  .pboard.shake{animation:shake .32s}
+  @keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+  .pstatus{font-size:12.5px;color:var(--ink-2);margin-top:8px;min-height:1.5em}
+
+  .btn{display:block;width:100%;margin-top:22px;font:inherit;font-weight:600;font-size:15px;
+    padding:11px 14px;border-radius:8px;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+  .btn:hover{filter:brightness(1.07)}
+  .btn:disabled{opacity:.55;cursor:default}
+
+  .result{margin-top:16px;padding:12px 14px;border-radius:8px;font-size:14px;display:none}
+  .result.on{display:block}
+  .result.ok{background:var(--human-bg);color:var(--human)}
+  .result.bad{background:var(--bot-bg);color:var(--bot)}
+  .result.warn{background:var(--warn-bg);color:var(--warn)}
+  .result b{display:block;font-size:15px}
+
+  /* ---------- behind the scenes ---------- */
+  .side h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
+  .side .card + .card{margin-top:18px}
+  .chan{border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .chan + .chan{margin-top:12px}
+  .chan-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .chan-h b{font-size:14px}
+  .pill{margin-left:auto;font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:2px 9px;border-radius:99px;
+    background:var(--bg);color:var(--ink-3)}
+  .pill.human{background:var(--human-bg);color:var(--human)}
+  .pill.bot{background:var(--bot-bg);color:var(--bot)}
+  .pill.none{background:var(--warn-bg);color:var(--warn)}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:3px 12px;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+  .kv b{color:var(--ink);font-weight:500;text-align:right}
+  .flags{list-style:none;padding:0;margin:8px 0 0;font-size:12.5px}
+  .flags li{padding:6px 9px;border-radius:6px;background:var(--bot-bg);color:#8a2a1f;margin-top:5px}
+  .flags li.note{background:var(--bg);color:var(--ink-2)}
+  .decision{margin-top:14px;padding:12px 14px;border-radius:10px;border:1px dashed var(--line-2);font-size:13.5px;color:var(--ink-2)}
+  .decision.human{border:1px solid #9fd8c1;background:var(--human-bg);color:var(--human)}
+  .decision.bot{border:1px solid #efb8af;background:var(--bot-bg);color:var(--bot)}
+  .decision b{font-size:16px;display:block}
+  .rule{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:10px;line-height:1.7}
+
+  .sim{display:block;width:100%;text-align:left;font:inherit;font-size:13px;margin-top:8px;padding:10px 12px;
+    border:1px solid var(--line-2);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer}
+  .sim:hover{border-color:var(--accent)}
+  .sim:disabled{opacity:.5;cursor:default}
+  .sim .lv{font-family:var(--mono);font-weight:700;color:var(--accent);margin-right:6px}
+  .sim small{display:block;color:var(--ink-3);font-size:12px;margin-top:2px}
+  .note{font-size:12.5px;color:var(--ink-2)}
+  .note b{color:var(--ink)}
+
+  .ghost{position:fixed;left:0;top:0;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
+    background:var(--bot);box-shadow:0 0 0 4px rgba(196,59,43,.2);pointer-events:none;z-index:50;display:none}
+  .ghost.on{display:block}
+
+  @media (prefers-reduced-motion:reduce){.pboard.shake{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">T</div><span class="brand">Test Portal</span>
+  <a class="back" href="/">← back to the detector</a>
+</div>
+
+<div class="wrap">
+  <main class="card">
+    <h1>Sign in</h1>
+    <div class="studybar">Study mode · participant <b id="studyCode"></b> · trials recorded: <b id="studyTrial">0</b>
+      <br>Only puzzle timing and a background-movement score are recorded, under this code. No name, no password.</div>
+    <p class="lede">A throwaway test site. Two bot checks run at once while you use it:
+      your background mouse movement on this page, and the moving puzzle below.</p>
+
+    <form id="form" autocomplete="off">
+      <label class="f" for="user">Username</label>
+      <input class="t" id="user" name="user" type="text" spellcheck="false">
+      <label class="f" for="pass">Password</label>
+      <input class="t" id="pass" name="pass" type="password">
+      <p class="creds">Test account: <code>demo</code> / <code>letmein</code></p>
+
+      <div class="ptitle"><b>Drag the piece onto the outline of the same shape</b><span id="ptries"></span></div>
+      <div class="pboard" id="pboard">
+        <div class="piece" id="piece" aria-label="puzzle piece"></div>
+      </div>
+      <p class="pstatus" id="pstatus">loading puzzle…</p>
+
+      <button class="btn" id="signin" type="submit">Sign in</button>
+    </form>
+    <div class="result" id="result"></div>
+  </main>
+
+  <aside class="side">
+    <div class="card">
+      <h2>Behind the scenes</h2>
+
+      <div class="chan">
+        <div class="chan-h"><b>Background mouse movement</b><span class="pill" id="pvPill">collecting</span></div>
+        <div class="kv">
+          <span>samples on this page</span><b id="pvSamples">0</b>
+          <span>live preview P(bot)</span><b id="pvLive">·</b>
+          <span>at sign-in: median P(bot)</span><b id="pvMedian">·</b>
+          <span>chunks scored</span><b id="pvChunks">·</b>
+          <span>veto threshold</span><b id="pvThr">·</b>
+        </div>
+      </div>
+
+      <div class="chan">
+        <div class="chan-h"><b>Moving puzzle</b><span class="pill" id="pzPill">waiting</span></div>
+        <div class="kv">
+          <span>slot jumped</span><b id="pzJump">·</b>
+          <span>re-aim onset after ack</span><b id="pzOnset">·</b>
+          <span>ack → placed (server clock)</span><b id="pzDrop">·</b>
+          <span>carried toward old slot</span><b id="pzCarry">·</b>
+          <span>server-clocked samples</span><b id="pzSamples">·</b>
+        </div>
+        <ul class="flags" id="pzFlags"></ul>
+      </div>
+
+      <div class="decision" id="decision"><b>—</b>sign in to see the combined decision</div>
+      <p class="rule">puzzle fail → BOT<br>puzzle pass + background ≥ threshold → BOT (veto)<br>
+        puzzle pass + background below threshold → HUMAN<br>
+        puzzle pass + too little background → HUMAN (no evidence)</p>
+    </div>
+
+    <div class="card">
+      <h2>Try a bot</h2>
+      <p class="note">Each bot types the credentials, moves the "mouse" across the page
+        (red dot) and solves the puzzle. Keep this tab in the foreground while it runs.</p>
+      <button class="sim" data-level="1"><span class="lv">L1</span>scripted
+        <small>pyautogui-style straight lines · straight drag to where the slot started</small></button>
+      <button class="sim" data-level="2"><span class="lv">L2</span>feature-matched, open-loop
+        <small>shuffled-speed evasive mouse (the Tier 4 bot) · pre-planned drag</small></button>
+      <button class="sim" data-level="3"><span class="lv">L3</span>closed-loop, instant
+        <small>finds the slot in the board image (vision) and re-aims the moment it moves</small></button>
+      <button class="sim" data-level="4"><span class="lv">L4</span>closed-loop, human-like delay
+        <small>finds the slot by vision, then waits a sampled 180–260 ms before re-aiming</small></button>
+      <div class="kv" style="margin-top:10px"><span>bot vision cost</span><b id="visCost">·</b></div>
+      <p class="note" style="margin-top:12px"><b>Expected:</b> L1 and L2 miss the moved slot,
+        and L3 re-aims too fast. In testing (headless Chrome, 1400×1000) the background check
+        vetoed none of the four: they scored about 0.4–0.7, under its 0.87 line. L1's score
+        depends on the page layout and can land near the line. That line was set for a 1% human false-positive
+        budget, and it is the Tier 4 result live: passive statistics can be copied, which is
+        why the puzzle exists.
+        <b>L4 gets in</b> — a bot that models human reaction delay passes. The slot is only ever
+        drawn into the board image among decoys, so every bot here has to find it by looking at
+        pixels. That costs the attacker a perception step (its measured cost is shown above), not
+        a wall. The puzzle raises the cost of an attack; it does not make one impossible. All
+        puzzle thresholds are hand-set, not calibrated on real users.</p>
+    </div>
+  </aside>
+</div>
+
+<div class="ghost" id="ghost"></div>
+
+<script src="features.js"></script>
+<script src="login.js"></script>
+</body>
+</html>

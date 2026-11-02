@@ -33,9 +33,14 @@
   var lastScore = null;            // {score, source, feat, seg} of the most recent chunk
   var botRuns = [];                // {score} for each bot-sim run, for the "caught" counter
 
-  var CSS = getComputedStyle(document.documentElement);
-  var COL_HUMAN = CSS.getPropertyValue('--human').trim();
-  var COL_BOT = CSS.getPropertyValue('--bot').trim();
+  // Trail colours come from the stylesheet and are read at draw time, so they
+  // follow the light/dark appearance if it changes while the page is open.
+  var COL_HUMAN = '--trail-human';
+  var COL_BOT = '--trail-bot';
+  function cssVar(name, fallback) {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
 
   // ---------- canvas ----------
   function resize() {
@@ -47,7 +52,8 @@
   window.addEventListener('resize', resize);
   resize();
 
-  function draw(points, colour) {
+  function draw(points, colourVar) {
+    var colour = cssVar(colourVar, colourVar === COL_BOT ? '#ff7d6c' : '#5fe9b6');
     var rect = arena.getBoundingClientRect();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!points || points.length < 2) return;
@@ -185,6 +191,7 @@
   }
   function runSim(source, points) {
     lastSource = source;
+    arena.classList.add('active');              // hide the "move your mouse" hint under the bot's trail
     var i = 0;
     (function step() {
       i += 4;

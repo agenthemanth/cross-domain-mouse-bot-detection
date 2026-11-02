@@ -70,62 +70,146 @@ public class DemoServer {
     private static boolean LOG_TRIALS = false;
     private static final File TRIALS_FILE = new File(new File(DEMO_DIR, "study_data"), "trials.jsonl");
 
+    /** Largest request body accepted. The biggest legitimate body is a sign-in's background trace. */
+    static final int MAX_BODY_BYTES = 1 << 20;   // 1 MiB
+
+    /** Static files the server will hand out; everything else under demo/ stays private. */
+    private static final java.util.Set<String> STATIC_EXT =
+            java.util.Set.of(".html", ".js", ".css", ".json", ".png", ".svg", ".ico");
+
+    private static final String USAGE =
+            "usage: DemoServer [port] [--host <addr>] [--oracle] [--log-trials]\n"
+          + "  port          TCP port (default 8787)\n"
+          + "  --host        bind address (default 127.0.0.1, loopback only)\n"
+          + "  --oracle      enable /challenge/oracle and /puzzle/oracle (bot sims and probes;\n"
+          + "                they hand out answers -- never enable on a real deployment)\n"
+          + "  --log-trials  append every sign-in to demo/study_data/trials.jsonl (participant study)";
+
     public static void main(String[] args) throws Exception {
         // the CAPTCHA renders glyphs with AWT; never needs a display
         System.setProperty("java.awt.headless", "true");
         int port = 8787;
-        for (String a : args) {
+        String host = "127.0.0.1";
+        for (int i = 0; i < args.length; i++) {
+            String a = args[i];
             if (a.equals("--oracle")) ORACLE = true;
             else if (a.equals("--log-trials")) LOG_TRIALS = true;
-            else port = Integer.parseInt(a);
+            else if (a.equals("--host") && i + 1 < args.length) host = args[++i];
+            else if (a.equals("-h") || a.equals("--help")) { System.out.println(USAGE); return; }
+            else {
+                try {
+                    port = Integer.parseInt(a);
+                    if (port < 1 || port > 65535) throw new NumberFormatException();
+                } catch (NumberFormatException e) {
+                    System.err.println("unrecognised argument: " + a + "\n" + USAGE);
+                    System.exit(2);
+                }
+            }
         }
 
-        rf = (RandomForest) SerializationHelper.read(new File(MODEL_DIR, "rf.model").getPath());
-        schema = new Instances(new BufferedReader(new FileReader(new File(MODEL_DIR, "schema.arff"))));
+        File modelFile = new File(MODEL_DIR, "rf.model");
+        if (!modelFile.isFile()) {
+            System.err.println("model not found: " + modelFile.getPath()
+                    + "\nRun from the repo root, after freezing the model with DemoModelTrainer (see demo/README.md).");
+            System.exit(1);
+        }
+        rf = (RandomForest) SerializationHelper.read(modelFile.getPath());
+        try (BufferedReader r = new BufferedReader(new FileReader(new File(MODEL_DIR, "schema.arff")))) {
+            schema = new Instances(r);
+        }
         schema.setClassIndex(schema.numAttributes() - 1);
         botIdx = schema.classAttribute().indexOfValue("1");
         threshold = readThreshold();
 
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
-        server.createContext("/score", DemoServer::handleScore);
-        server.createContext("/challenge/", DemoServer::handleChallenge);
-        server.createContext("/puzzle/", DemoServer::handlePuzzle);
-        server.createContext("/auth/", DemoServer::handleAuth);
-        server.createContext("/", DemoServer::handleStatic);
+        HttpServer server = HttpServer.create(new InetSocketAddress(host, port), 0);
+        server.createContext("/score", guarded(DemoServer::handleScore));
+        server.createContext("/challenge/", guarded(DemoServer::handleChallenge));
+        server.createContext("/puzzle/", guarded(DemoServer::handlePuzzle));
+        server.createContext("/auth/", guarded(DemoServer::handleAuth));
+        server.createContext("/healthz", guarded(ex -> send(ex, 200, "application/json", "{\"status\":\"ok\"}")));
+        server.createContext("/", guarded(DemoServer::handleStatic));
+        // Deliberately single-threaded: per-puzzle / per-challenge state is not
+        // synchronised, and the server-clock timestamps are the measurement.
         server.setExecutor(null);
         server.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(1)));
 
-        System.out.println("demo model  : " + schema.numAttributes() + " attrs, threshold P(bot) >= " + threshold);
-        System.out.println("serving      : http://127.0.0.1:" + port + "/");
-        if (ORACLE) System.out.println("WARNING      : /puzzle/oracle is ON (hands out the slot) -- probes only, never a real deployment");
+        System.out.println("demo model   : " + schema.numAttributes() + " attrs, threshold P(bot) >= " + threshold);
+        System.out.println("serving      : http://" + host + ":" + port + "/");
+        if (ORACLE) System.out.println("WARNING      : oracle routes are ON (they hand out answers) -- demos and probes only, never a real deployment");
         if (LOG_TRIALS) System.out.println("study log    : appending every sign-in to " + TRIALS_FILE.getPath());
         System.out.println("(Ctrl+C to stop)");
+    }
+
+    /** Thrown by {@link #readBody} when a request body exceeds {@link #MAX_BODY_BYTES}. */
+    static final class PayloadTooLarge extends RuntimeException {
+        PayloadTooLarge() { super("request body too large", null, false, false); }
+    }
+
+    /**
+     * Wraps every route: security headers, an early 413 on an oversized
+     * Content-Length, and a last-resort handler so no exception text or stack
+     * trace ever reaches the client.
+     */
+    private static com.sun.net.httpserver.HttpHandler guarded(com.sun.net.httpserver.HttpHandler h) {
+        return ex -> {
+            try {
+                securityHeaders(ex);
+                String len = ex.getRequestHeaders().getFirst("Content-Length");
+                if (len != null) {
+                    long n;
+                    try { n = Long.parseLong(len.trim()); } catch (NumberFormatException e) { n = -1; }
+                    if (n < 0 || n > MAX_BODY_BYTES) {
+                        send(ex, n < 0 ? 400 : 413, "application/json",
+                                n < 0 ? "{\"error\":\"bad Content-Length\"}" : "{\"error\":\"request body too large\"}");
+                        return;
+                    }
+                }
+                h.handle(ex);
+            } catch (Throwable t) {
+                fail(ex, t);
+            } finally {
+                ex.close();
+            }
+        };
+    }
+
+    /** Maps an exception to a response without leaking its message; logs the detail server-side. */
+    private static void fail(HttpExchange ex, Throwable t) {
+        try {
+            if (t instanceof PayloadTooLarge) {
+                send(ex, 413, "application/json", "{\"error\":\"request body too large\"}");
+            } else {
+                System.err.println("[" + ex.getRequestMethod() + " " + ex.getRequestURI().getPath() + "] " + t);
+                send(ex, 500, "application/json", "{\"error\":\"internal error\"}");
+            }
+        } catch (IOException | RuntimeException alreadyCommitted) {
+            // response headers were already sent; nothing more can be reported to this client
+        }
     }
 
     // ---------------- /score ----------------
 
     private static void handleScore(HttpExchange ex) throws IOException {
-        cors(ex);
-        if ("OPTIONS".equals(ex.getRequestMethod())) { ex.sendResponseHeaders(204, -1); ex.close(); return; }
         if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
 
-        String body;
-        try (InputStream in = ex.getRequestBody()) {
-            body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
+        String body = readBody(ex);
         double[] feat = parseFeatures(body);
         if (feat == null || feat.length != schema.numAttributes() - 1) {
             send(ex, 400, "application/json",
                     "{\"error\":\"expected 'features' array of " + (schema.numAttributes() - 1) + " numbers\"}");
             return;
         }
+        for (double v : feat) {
+            if (!Double.isFinite(v)) { send(ex, 400, "application/json", "{\"error\":\"features must be finite numbers\"}"); return; }
+        }
         try {
             double score = forestScore(feat);
             String label = score >= threshold ? "BOT" : "HUMAN";
-            send(ex, 200, "application/json", String.format(
+            send(ex, 200, "application/json", String.format(java.util.Locale.ROOT,
                     "{\"score\":%.6f,\"label\":\"%s\",\"threshold\":%.4f}", score, label, threshold));
         } catch (Exception e) {
-            send(ex, 500, "application/json", "{\"error\":\"" + e.getMessage() + "\"}");
+            fail(ex, e);
         }
     }
 
@@ -139,8 +223,6 @@ public class DemoServer {
     // ---------------- /puzzle/* (perturbation-response channel) ----------------
 
     private static void handlePuzzle(HttpExchange ex) throws IOException {
-        cors(ex);
-        if ("OPTIONS".equals(ex.getRequestMethod())) { ex.sendResponseHeaders(204, -1); ex.close(); return; }
         String path = ex.getRequestURI().getPath();
         try {
             if (path.equals("/puzzle/oracle")) {
@@ -176,7 +258,7 @@ public class DemoServer {
                     send(ex, 404, "application/json", "{\"error\":\"no such endpoint\"}");
             }
         } catch (Exception e) {
-            send(ex, 500, "application/json", "{\"error\":" + CaptchaChallenge.jsonStr(String.valueOf(e)) + "}");
+            fail(ex, e);
         }
     }
 
@@ -198,8 +280,6 @@ public class DemoServer {
      *   puzzle PASS, passive not scorable   -> HUMAN (passive: no evidence)
      */
     private static void handleAuth(HttpExchange ex) throws IOException {
-        cors(ex);
-        if ("OPTIONS".equals(ex.getRequestMethod())) { ex.sendResponseHeaders(204, -1); ex.close(); return; }
         if (!"/auth/login".equals(ex.getRequestURI().getPath())) { send(ex, 404, "application/json", "{\"error\":\"no such endpoint\"}"); return; }
         if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
         String body = readBody(ex);
@@ -265,7 +345,7 @@ public class DemoServer {
             if (LOG_TRIALS) logTrial(body, response, puzzle);
             send(ex, 200, "application/json", response);
         } catch (Exception e) {
-            send(ex, 500, "application/json", "{\"error\":" + CaptchaChallenge.jsonStr(String.valueOf(e)) + "}");
+            fail(ex, e);
         }
     }
 
@@ -333,8 +413,6 @@ public class DemoServer {
     // ---------------- /challenge/* (the CAPTCHA channel) ----------------
 
     private static void handleChallenge(HttpExchange ex) throws IOException {
-        cors(ex);
-        if ("OPTIONS".equals(ex.getRequestMethod())) { ex.sendResponseHeaders(204, -1); ex.close(); return; }
 
         String path = ex.getRequestURI().getPath();
         Map<String, String> q = query(ex.getRequestURI().getRawQuery());
@@ -342,6 +420,7 @@ public class DemoServer {
         try {
             switch (path) {
                 case "/challenge/new": {
+                    if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
                     CaptchaChallenge.Challenge ch = CaptchaChallenge.issue();
                     send(ex, 200, "application/json", CaptchaChallenge.boardJson(ch));
                     return;
@@ -349,7 +428,8 @@ public class DemoServer {
                 case "/challenge/tile": {
                     CaptchaChallenge.Challenge ch = CaptchaChallenge.get(q.get("id"));
                     if (ch == null) { send(ex, 404, "application/json", "{\"error\":\"unknown challenge\"}"); return; }
-                    int k = Integer.parseInt(q.getOrDefault("k", "-1"));
+                    int k;
+                    try { k = Integer.parseInt(q.getOrDefault("k", "-1")); } catch (NumberFormatException e) { k = -1; }
                     if (k < 0 || k >= ch.tiles.size()) { send(ex, 400, "application/json", "{\"error\":\"bad tile\"}"); return; }
                     sendBytes(ex, CaptchaChallenge.renderTile(ch, k));
                     return;
@@ -369,7 +449,9 @@ public class DemoServer {
                     // without an OCR model. It grants the attacker a PERFECT
                     // perceptual layer for free, which is exactly the point:
                     // it isolates the timing channel as the only thing under
-                    // test. A real deployment must not expose this route.
+                    // test. A real deployment must not expose this route, so it
+                    // is OFF unless the server was started with --oracle.
+                    if (!ORACLE) { send(ex, 404, "application/json", "{\"error\":\"oracle disabled (start DemoServer with --oracle)\"}"); return; }
                     CaptchaChallenge.Challenge ch = CaptchaChallenge.get(q.get("id"));
                     if (ch == null) { send(ex, 404, "application/json", "{\"error\":\"unknown challenge\"}"); return; }
                     if (ch.failed || ch.done()) { send(ex, 409, "application/json", "{\"error\":\"no active hop\"}"); return; }
@@ -399,13 +481,16 @@ public class DemoServer {
                     send(ex, 404, "application/json", "{\"error\":\"no such endpoint\"}");
             }
         } catch (Exception e) {
-            send(ex, 500, "application/json", "{\"error\":" + CaptchaChallenge.jsonStr(String.valueOf(e)) + "}");
+            fail(ex, e);
         }
     }
 
+    /** Reads the body, refusing anything over {@link #MAX_BODY_BYTES} (also catches chunked bodies with no Content-Length). */
     private static String readBody(HttpExchange ex) throws IOException {
         try (InputStream in = ex.getRequestBody()) {
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            byte[] b = in.readNBytes(MAX_BODY_BYTES + 1);
+            if (b.length > MAX_BODY_BYTES) throw new PayloadTooLarge();
+            return new String(b, StandardCharsets.UTF_8);
         }
     }
 
@@ -426,7 +511,8 @@ public class DemoServer {
 
     private static double jsonNumber(String body, String key, double fallback) {
         Matcher m = Pattern.compile("\"" + key + "\"\\s*:\\s*(-?[0-9.]+)").matcher(body);
-        return m.find() ? Double.parseDouble(m.group(1)) : fallback;
+        if (!m.find()) return fallback;
+        try { return Double.parseDouble(m.group(1)); } catch (NumberFormatException e) { return fallback; }
     }
 
     /** Pulls {@code "trace":[[t,x,y],...]} out of the body. Returns null when absent. */
@@ -455,27 +541,50 @@ public class DemoServer {
 
     // ---------------- static files ----------------
 
+    /**
+     * Serves the page assets only. demo/ also holds the model, study logs,
+     * server logs and Python probes, so this is an allow-list: a known web
+     * extension, no hidden/underscore files, and never anything under study_data/.
+     */
     private static void handleStatic(HttpExchange ex) throws IOException {
-        cors(ex);
+        String method = ex.getRequestMethod();
+        if (!"GET".equals(method) && !"HEAD".equals(method)) { send(ex, 405, "text/plain", "GET only"); return; }
         String p = ex.getRequestURI().getPath();
         if (p.equals("/") || p.isEmpty()) p = "/index.html";
+        File root = DEMO_DIR.getCanonicalFile();
         File f = new File(DEMO_DIR, p.replace("/", File.separator)).getCanonicalFile();
-        if (!f.getPath().startsWith(DEMO_DIR.getCanonicalFile().getPath()) || !f.isFile()) {
-            send(ex, 404, "text/plain", "not found: " + p);
+        String name = f.getName();
+        int dot = name.lastIndexOf('.');
+        String ext = dot < 0 ? "" : name.substring(dot).toLowerCase(java.util.Locale.ROOT);
+        boolean allowed = f.toPath().startsWith(root.toPath())
+                && !f.toPath().startsWith(new File(root, "study_data").toPath())
+                && !name.startsWith(".") && !name.startsWith("_")
+                && STATIC_EXT.contains(ext)
+                && f.isFile();
+        if (!allowed) {
+            send(ex, 404, "text/plain", "not found");
             return;
         }
         byte[] bytes = Files.readAllBytes(f.toPath());
-        ex.getResponseHeaders().set("Content-Type", contentType(f.getName()));
+        ex.getResponseHeaders().set("Content-Type", contentType(ext));
+        // pages and scripts change between runs of a demo; always revalidate
+        ex.getResponseHeaders().set("Cache-Control", "no-cache");
+        if ("HEAD".equals(method)) { ex.sendResponseHeaders(200, -1); return; }
         ex.sendResponseHeaders(200, bytes.length);
         try (OutputStream os = ex.getResponseBody()) { os.write(bytes); }
     }
 
-    private static String contentType(String name) {
-        if (name.endsWith(".html")) return "text/html; charset=utf-8";
-        if (name.endsWith(".js")) return "text/javascript; charset=utf-8";
-        if (name.endsWith(".css")) return "text/css; charset=utf-8";
-        if (name.endsWith(".json")) return "application/json; charset=utf-8";
-        return "application/octet-stream";
+    private static String contentType(String ext) {
+        switch (ext) {
+            case ".html": return "text/html; charset=utf-8";
+            case ".js":   return "text/javascript; charset=utf-8";
+            case ".css":  return "text/css; charset=utf-8";
+            case ".json": return "application/json; charset=utf-8";
+            case ".png":  return "image/png";
+            case ".svg":  return "image/svg+xml";
+            case ".ico":  return "image/x-icon";
+            default:      return "application/octet-stream";
+        }
     }
 
     // ---------------- helpers ----------------
@@ -487,10 +596,19 @@ public class DemoServer {
         return 0.5;
     }
 
-    private static void cors(HttpExchange ex) {
-        ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        ex.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+    /**
+     * Same-origin only: the pages are served by this server, so no CORS headers
+     * are sent (the old wildcard let any website drive the API from a visitor's
+     * browser). Pages may not be framed, which also blocks clickjacking the puzzle.
+     */
+    private static void securityHeaders(HttpExchange ex) {
+        var h = ex.getResponseHeaders();
+        h.set("X-Content-Type-Options", "nosniff");
+        h.set("X-Frame-Options", "DENY");
+        h.set("Referrer-Policy", "no-referrer");
+        h.set("Content-Security-Policy",
+                "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+              + "script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     }
 
     private static void send(HttpExchange ex, int code, String type, String body) throws IOException {

@@ -162,7 +162,7 @@ optimism, and it is why the honest headline is ~3.4% FPR, not ~1%.
 |---|---|
 | `CaptchaChallenge.java` | Sequential-reveal CAPTCHA. 12 server-rendered distorted glyph PNGs (`java.awt`, no new deps), 5 hops, **one target revealed at a time** with each release stamped on the server clock — so the route cannot be precomputed or replayed. Owns its own rule-based scorer and `Rules` thresholds. |
 | `demo/challenge.html`, `demo/challenge.js` | The challenge page and its four in-page attack sims. |
-| `demo/attack_probe.py` | `python demo/attack_probe.py <port>` — drives `/challenge/*` end to end and prints the verdict each attacker profile gets. Stdlib only. → `captcha_channel_results.txt` |
+| `demo/attack_probe.py` | Needs `DemoServer <port> --oracle`. `python demo/attack_probe.py <port>` — drives `/challenge/*` end to end and prints the verdict each attacker profile gets. Stdlib only. → `captcha_channel_results.txt` |
 
 ### Test login page (moving puzzle + passive check, judged together)
 
@@ -188,7 +188,9 @@ arguments through, e.g. `run_demo.bat --log-trials`.
 Routes on `DemoServer`: `POST /challenge/new`, `GET /challenge/tile`,
 `GET /challenge/prompt`, `POST /challenge/arrive`, `POST /challenge/verify`, and
 `GET /challenge/oracle` (**demo affordance — hands out the answer so a sim can
-play without an OCR model; must not ship**).
+play without an OCR model; must not ship**; 404 unless started with `--oracle`, which
+`run_demo.bat` passes), plus `GET /healthz`. Server options and the hardening
+(static allow-list, 1 MiB body cap, no CORS, CSP) are in `demo/README.md` → "Server options".
 
 **Two channels, never one score.** The forest is deliberately *not* applied to
 CAPTCHA traces — on the same 5 held-out users, Tier 3 measured that short
@@ -314,7 +316,7 @@ CNN (Wei et al.), or a velocity-sequence deep model.
 | `IEEE_PAPER_HANDBOOK.md` | ✅ current (2026-10-06). Handbook for a co-author new to the project: plain-language overview, result-vs-design-vs-demo split, algorithms as pseudocode, a master results sheet (copied from `PAPER_GUIDE.md` §20 + `latency_results.txt` + `login_channel_results.txt`), banned numbers, IEEE format/page budget, and copy-paste LLM prompts (one master prompt + one per paper section + an audit prompt). Not a source of truth. |
 | `REBASELINE_NOTES.md` | ✅ current. The `circles_human_fast` normalised-coordinate rescale, with the before/after table and how it was measured. |
 | `demo/README.md` | ✅ current. Demo build / parity / run / caveats, plus the CAPTCHA channel's design, trust boundary and measured attack table. |
-| `captcha_channel_results.txt` | ✅ current. Attack-probe log for the CAPTCHA channel. Regenerate with `python demo/attack_probe.py <port>`. |
+| `captcha_channel_results.txt` | ✅ current. Attack-probe log for the CAPTCHA channel. Regenerate: `DemoServer <port> --oracle`, then `python demo/attack_probe.py <port>`. |
 | `login_channel_results.txt` | ✅ current (2026-09-24). Puzzle ladder + human models across 4 simulated links, with old-vs-new timing rule. Regenerate: `DemoServer <port> --oracle`, then `python demo/login_probe.py <port>`. |
 | `latency_results.txt` | ✅ current. `LatencyBench` output. |
 | `TIER1-4_EVALUATION.html` | ⚠️ **STALE**, now carries a SUPERSEDED banner at the top. Pre-rescale numbers throughout (0.5326, 9.85%, 12.39%) and the retracted 1.07% FPR. Kept for history; never quote. |

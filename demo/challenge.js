@@ -8,6 +8,11 @@
 (function () {
   'use strict';
 
+  function cssVar(name, fallback) {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
   var board = document.getElementById('board');
   var canvas = document.getElementById('trail');
   var ctx = canvas.getContext('2d');
@@ -58,7 +63,7 @@
     if (trace.length < 2) return;
     var s = scale();
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 2;
-    var col = actor === 'you' ? '#5fe9b6' : '#ff7d6c';
+    var col = actor === 'you' ? cssVar('--board-trail-human', '#30d158') : cssVar('--board-trail-bot', '#ff453a');
     ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 7;
     for (var i = 1; i < trace.length; i++) {
       ctx.globalAlpha = Math.max(0.07, i / trace.length);
@@ -252,7 +257,22 @@
 
   function oracle() {
     return fetch('/challenge/oracle?id=' + encodeURIComponent(ch.id))
-      .then(function (r) { return r.json(); });
+      .then(function (r) {
+        if (r.status === 404) throw new Error('oracle-off');
+        if (!r.ok) throw new Error('oracle request failed (' + r.status + ')');
+        return r.json();
+      });
+  }
+
+  function attackFailed(err) {
+    board.classList.add('locked');
+    if (err && err.message === 'oracle-off') {
+      setVeil(true, 'Bot simulations are off',
+        'They need the answer oracle, which is disabled by default. Restart the server with --oracle (run_demo.bat does this) to use them.');
+      el.hint.textContent = 'attack sims need the server started with --oracle';
+    } else {
+      el.hint.textContent = 'attack stopped — server offline?';
+    }
   }
 
   function centre(k) {
@@ -339,7 +359,7 @@
       };
       el.hint.textContent = name + ' running…';
       return step();
-    });
+    }).catch(attackFailed);
   }
 
   function jitter(mean, spread) {

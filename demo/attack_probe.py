@@ -4,12 +4,13 @@ Drives the /challenge/* protocol end to end against a running DemoServer and
 prints what verdict each attacker profile receives, so the rule engine's
 behaviour is MEASURED rather than asserted.
 
-    java -cp "target/classes;<weka>;<bounce>" DemoServer 8787
+    java -cp "target/classes;<weka>;<bounce>" DemoServer 8787 --oracle
     python demo/attack_probe.py [port]
 
 Every profile is handed the answer by /challenge/oracle -- i.e. a perfect OCR
 attacker is granted for free, so the timing channel is the only thing under
-test. That route is a demo affordance and must never ship.
+test. That route is a demo affordance and must never ship -- the server only
+exposes it when started with --oracle.
 
 The honest headline is the LAST row: a bot that sleeps a jittered, human-like
 delay passes every rule here. The channel's value is not that it stops that bot,

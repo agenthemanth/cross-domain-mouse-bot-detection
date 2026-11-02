@@ -1,9 +1,11 @@
 # Mouse-dynamics bot detector — live demo
 
-Two pages, served by `DemoServer`:
+Three pages, served by `DemoServer` and sharing one stylesheet (`demo/app.css`, light and dark):
 
 - **`/`** (`demo/index.html`) — the passive detector. Move the mouse for a live
   P(bot) score; bot-sim buttons; movable decision line.
+- **`/login.html`** — the **sign-in test**: background mouse check plus the moving
+  puzzle, judged together on the server. See [The test login page](#the-test-login-page-loginhtml).
 - **`/challenge.html`** — the **sequential-reveal CAPTCHA**, the active second
   channel. See [The CAPTCHA channel](#the-captcha-channel) below.
 
@@ -61,8 +63,11 @@ even with a correct model.
 
 ## Run the demo
 
+On Windows, double-click `run_demo.bat` (compiles, then starts the server with
+`--oracle` so every bot sim works). Or by hand:
+
 ```
-java -cp "target/classes;<weka>;<bounce>" DemoServer          # port 8787
+java -cp "target/classes;<weka>;<bounce>" DemoServer --oracle          # port 8787
 ```
 
 Open <http://127.0.0.1:8787/>. Move the mouse in the box for a live P(bot); the
@@ -70,6 +75,43 @@ sim buttons reproduce known bot movement models. Drag the decision line to see t
 recall / false-positive trade-off (the Tier 5 finding).
 
 `POST /score` body `{"features":[<18 numbers>]}` → `{"score":…,"label":…,"threshold":…}`.
+
+### Server options
+
+```
+DemoServer [port] [--host <addr>] [--oracle] [--log-trials]
+```
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `port` | `8787` | TCP port |
+| `--host` | `127.0.0.1` | Bind address. Loopback only unless you change it. |
+| `--oracle` | off | Enables `/challenge/oracle` and `/puzzle/oracle`, which hand out answers. Needed by the CAPTCHA page's attack sims and by `attack_probe.py` / `login_probe.py`. |
+| `--log-trials` | off | Appends each sign-in to `demo/study_data/trials.jsonl` (participant study). |
+
+`GET /healthz` returns `{"status":"ok"}` for a liveness check.
+
+### Running safely
+
+Without `--oracle` the server is safe to expose beyond a demo laptop; with it, it is not.
+What the server does regardless of flags:
+
+- **Static files are an allow-list.** Only `.html .js .css .json .png .svg .ico` under
+  `demo/` are served. `study_data/`, the model file, logs, Python probes and any
+  dot- or underscore-prefixed file return 404.
+- **Request bodies are capped at 1 MiB** (413 above that).
+- **Errors never leak internals.** A failure returns `{"error":"internal error"}`;
+  the detail goes to the server's stderr.
+- **Same-origin only.** No CORS headers, plus `Content-Security-Policy`,
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and
+  `Referrer-Policy: no-referrer`.
+- **Single-threaded on purpose.** Per-puzzle and per-challenge state is not
+  synchronised, and the server-clock timestamps are the measurement, so requests
+  are handled one at a time.
+
+Not production-grade yet: there is no TLS (put it behind a reverse proxy), no rate
+limiting, and live challenges are held in memory (5-minute TTL), so they don't
+survive a restart and don't share across instances.
 
 ## Known behaviour
 
@@ -298,7 +340,8 @@ outlier (same run: 0.0009).
   matcher or an OCR model still wins, and is meant to. The sequential reveal and
   the server clock are what the design rests on.
 - `/challenge/oracle` hands out the current answer. It exists for the attack
-  probe and the in-page sims only and **must not ship**.
+  probe and the in-page sims only and **must not ship**. It returns 404 unless the
+  server was started with `--oracle`.
 - `corrective submovements` is reported for inspection and never fails a
   challenge on its own — it is a client-side signal resting on an untested motor
   hypothesis, and Tier 6 is the cautionary tale for trusting one of those.

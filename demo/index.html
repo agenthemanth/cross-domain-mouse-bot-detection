@@ -2,258 +2,203 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mouse-Dynamics Bot Detector — live demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Live mouse-dynamics bot detector: a Random Forest scores your mouse movement as you move.">
+<title>Detector · Mouse-dynamics bot detection</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
 <style>
-  :root{
-    /* ambient field */
-    --void:#070a12;
-    --orb-1:#6f5cff;   /* violet  */
-    --orb-2:#25e6c5;   /* teal    */
-    --orb-3:#ff5c8a;   /* magenta */
-    --orb-4:#4d84ff;   /* blue    */
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 1rem; align-items: start; }
+  @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
 
-    /* glass */
-    --glass:rgba(255,255,255,.055);
-    --glass-hi:rgba(255,255,255,.10);
-    --edge:rgba(255,255,255,.14);
-    --edge-lit:rgba(255,255,255,.42);
-    --shadow:0 24px 70px -24px rgba(0,0,0,.65);
-    --inner:inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 rgba(0,0,0,.18);
-
-    /* ink */
-    --ink:rgba(255,255,255,.95);
-    --ink-soft:rgba(255,255,255,.60);
-    --ink-faint:rgba(255,255,255,.38);
-
-    /* state */
-    --human:#5fe9b6;
-    --bot:#ff7d6c;
-    --warn:#ffce6b;
-
-    --r-lg:26px; --r-md:15px; --r-sm:10px;
-    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",system-ui,sans-serif;
-    --mono:"SF Mono",ui-monospace,SFMono-Regular,Menlo,"Cascadia Mono",monospace;
+  /* ---- the arena: a measurement surface, so no motion on it ---- */
+  .arena {
+    position: relative; height: 480px; overflow: hidden; cursor: crosshair;
+    border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-card);
+    display: flex; align-items: center; justify-content: center;
+    background-image: radial-gradient(var(--separator) 1px, transparent 1px);
+    background-size: 22px 22px;
+    touch-action: none;
   }
+  @media (max-width: 640px) { .arena { height: 360px; } }
+  canvas.trail { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hint { text-align: center; pointer-events: none; display: grid; gap: .35rem; transition: opacity 200ms ease; }
+  .hint .t { font-size: 1.0625rem; font-weight: 600; letter-spacing: -.016em; color: var(--ink-2); }
+  .hint .s { font-size: .8125rem; color: var(--ink-3); }
+  .arena.active .hint { opacity: 0; }
 
-  *{box-sizing:border-box;margin:0}
-  html,body{height:100%}
-  body{
-    font-family:var(--sans);color:var(--ink);line-height:1.5;
-    background:var(--void);
-    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
-    overflow-x:hidden;
+  /* ---- verdict ---- */
+  .verdict { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
+  .verdict .label { font-size: 2rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+  .verdict .label.human { color: var(--human); }
+  .verdict .label.bot { color: var(--bot); }
+  .verdict .label.idle { color: var(--ink-4); }
+  .verdict .p { font-family: var(--mono); font-size: .78rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+  .meter { position: relative; height: 10px; margin: 1.1rem 0 .45rem; border-radius: 999px; background: var(--surface-2); }
+  .meter .fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 999px;
+    background: var(--human); transition: width 180ms ease-out, background-color 150ms ease;
   }
-
-  /* ---------- ambient depth layer ---------- */
-  .ambient{position:fixed;inset:-20vmax;z-index:-1;filter:blur(70px) saturate(150%);pointer-events:none}
-  .ambient span{position:absolute;border-radius:50%;opacity:.55;mix-blend-mode:screen}
-  .ambient .a{width:52vmax;height:52vmax;left:-8vmax;top:-10vmax;background:radial-gradient(circle at 30% 30%,var(--orb-1),transparent 62%);animation:drift1 34s ease-in-out infinite}
-  .ambient .b{width:46vmax;height:46vmax;right:-6vmax;top:6vmax;background:radial-gradient(circle at 60% 40%,var(--orb-2),transparent 60%);animation:drift2 40s ease-in-out infinite}
-  .ambient .c{width:44vmax;height:44vmax;left:18vmax;bottom:-14vmax;background:radial-gradient(circle at 50% 50%,var(--orb-3),transparent 60%);animation:drift3 46s ease-in-out infinite}
-  .ambient .d{width:38vmax;height:38vmax;right:10vmax;bottom:-6vmax;background:radial-gradient(circle at 40% 60%,var(--orb-4),transparent 62%);animation:drift1 52s ease-in-out infinite reverse}
-  @keyframes drift1{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(6vmax,4vmax,0)}}
-  @keyframes drift2{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-5vmax,5vmax,0)}}
-  @keyframes drift3{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(4vmax,-6vmax,0)}}
-
-  /* ---------- glass surface ---------- */
-  .glass{
-    position:relative;
-    background:var(--glass);
-    -webkit-backdrop-filter:blur(30px) saturate(165%);
-    backdrop-filter:blur(30px) saturate(165%);
-    border:1px solid var(--edge);
-    border-radius:var(--r-lg);
-    box-shadow:var(--shadow),var(--inner);
+  .meter .fill.bot { background: var(--bot); }
+  .meter .thr {
+    position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1.5px; border-radius: 2px;
+    background: var(--threshold); box-shadow: 0 0 0 2px var(--surface);
   }
-  .glass::before{
-    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-    background:linear-gradient(175deg,var(--edge-lit),transparent 34%);
-    -webkit-mask:linear-gradient(#000,transparent 46%);mask:linear-gradient(#000,transparent 46%);
-    opacity:.7;
+  .scale { display: flex; justify-content: space-between; font-size: .72rem; color: var(--ink-4); }
+
+  .thr-ctl { display: grid; gap: .2rem; margin-top: 1.1rem; padding: .85rem .95rem; border-radius: var(--r-md); background: var(--surface-2); }
+  .thr-ctl #thrNote { font-size: .8125rem; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .thr-ctl input[type=range] { width: 100%; accent-color: var(--threshold); margin: .3rem 0 .1rem; cursor: pointer; }
+  .thr-hint { font-size: .75rem; color: var(--ink-3); cursor: pointer; }
+  .thr-hint:hover { color: var(--accent); }
+
+  .divider { height: 1px; background: var(--separator); margin: 1.25rem 0; border: 0; }
+
+  .catch { font-size: .8125rem; color: var(--ink-3); margin-top: .85rem; }
+  .catch b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* ---- verdict log ---- */
+  .log { margin-top: 1rem; }
+  .rows { max-height: 196px; overflow-y: auto; font-size: .8125rem; }
+  .row {
+    display: grid; grid-template-columns: 76px 110px 1fr auto; gap: 1rem; padding: .45rem 0;
+    border-bottom: 1px solid var(--separator); color: var(--ink-3); font-variant-numeric: tabular-nums;
   }
+  .row:last-child { border: none; }
+  .row .v { font-weight: 600; }
+  .row .v.human { color: var(--human); }
+  .row .v.bot { color: var(--bot); }
+  .rows:empty::before { content: "No verdicts yet. Move your mouse in the area above, or run a bot."; color: var(--ink-4); }
 
-  /* ---------- layout ---------- */
-  .wrap{max-width:1160px;margin:0 auto;padding:40px 28px 64px;
-    display:grid;grid-template-columns:1fr 372px;gap:22px;align-items:start}
-  header{grid-column:1/-1;padding:26px 30px;display:flex;flex-direction:column;gap:6px}
-  h1{font-size:23px;font-weight:600;letter-spacing:-.018em}
-  .sub{color:var(--ink-soft);font-size:13.5px;max-width:74ch;letter-spacing:-.005em}
-  .sub code{font-family:var(--mono);font-size:11.5px;color:var(--ink);
-    background:var(--glass-hi);padding:1px 6px;border-radius:6px;border:1px solid var(--edge)}
-
-  .cta{align-self:flex-start;margin-top:10px;display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;
-    padding:11px 18px;border-radius:var(--r-md);text-decoration:none;color:var(--ink);font-weight:600;font-size:14px;
-    border:1px solid rgba(95,233,182,.45);background:rgba(95,233,182,.14);
-    transition:transform .16s ease,background .2s ease}
-  .cta:hover{transform:translateY(-1px);background:rgba(95,233,182,.22)}
-  .cta small{font-weight:400;font-size:12px;color:var(--ink-soft)}
-
-  /* ---------- arena ---------- */
-  .arena{
-    position:relative;height:472px;overflow:hidden;cursor:crosshair;
-    border-radius:var(--r-lg);
-    background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
-    -webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);
-    border:1px solid var(--edge);box-shadow:var(--shadow),var(--inner);
-    display:flex;align-items:center;justify-content:center;
-  }
-  canvas.trail{position:absolute;inset:0;width:100%;height:100%}
-  .hint{font-family:var(--mono);font-size:12.5px;color:var(--ink-faint);text-align:center;
-    pointer-events:none;transition:opacity .4s ease;line-height:1.9;letter-spacing:.02em}
-  .arena.active .hint{opacity:0}
-
-  /* ---------- panel ---------- */
-  .panel{padding:22px}
-  .panel h2{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.18em;
-    text-transform:uppercase;color:var(--ink-faint);margin-bottom:15px}
-
-  .verdict{display:flex;align-items:baseline;gap:11px;margin-bottom:2px}
-  .verdict .label{font-size:30px;font-weight:600;letter-spacing:-.02em;transition:color .3s ease}
-  .verdict .label.human{color:var(--human);text-shadow:0 0 24px rgba(95,233,182,.45)}
-  .verdict .label.bot{color:var(--bot);text-shadow:0 0 24px rgba(255,125,108,.45)}
-  .verdict .label.idle{color:var(--ink-faint)}
-  .verdict .p{font-family:var(--mono);font-size:12px;color:var(--ink-soft);letter-spacing:-.01em}
-
-  .meter{position:relative;height:14px;margin:16px 0 7px;border-radius:999px;overflow:hidden;
-    background:rgba(0,0,0,.32);box-shadow:inset 0 1px 3px rgba(0,0,0,.5),inset 0 -1px 0 rgba(255,255,255,.06)}
-  .meter .fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;
-    background:linear-gradient(90deg,#2fbf8f,var(--human));
-    box-shadow:0 0 18px rgba(95,233,182,.5);
-    transition:width .35s cubic-bezier(.32,.9,.32,1),background .3s ease,box-shadow .3s ease}
-  .meter .fill.bot{background:linear-gradient(90deg,#ff5c7a,var(--bot));
-    box-shadow:0 0 20px rgba(255,125,108,.55)}
-  .meter .thr{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--warn);
-    box-shadow:0 0 10px rgba(255,206,107,.8);transition:left .18s ease}
-  .scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;
-    color:var(--ink-faint);letter-spacing:.03em}
-
-  .thr-ctl{display:block;margin-top:13px}
-  .thr-ctl #thrNote{font-family:var(--mono);font-size:10.5px;color:var(--warn);
-    display:block;letter-spacing:.02em}
-  .thr-ctl input[type=range]{
-    -webkit-appearance:none;appearance:none;width:100%;height:26px;margin:2px 0 0;background:transparent;cursor:pointer}
-  .thr-ctl input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:999px;
-    background:linear-gradient(90deg,rgba(255,206,107,.25),rgba(255,206,107,.6))}
-  .thr-ctl input[type=range]::-moz-range-track{height:5px;border-radius:999px;background:rgba(255,206,107,.4)}
-  .thr-ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
-    width:16px;height:16px;margin-top:-6px;border-radius:50%;
-    background:radial-gradient(circle at 35% 30%,#fff,#ffce6b 70%);
-    border:1px solid rgba(255,255,255,.6);box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 12px rgba(255,206,107,.6)}
-  .thr-ctl input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;border:1px solid #fff;
-    background:#ffce6b;box-shadow:0 0 12px rgba(255,206,107,.6)}
-  .thr-hint{font-family:var(--mono);font-size:10px;color:var(--ink-faint);cursor:pointer;
-    letter-spacing:.02em;transition:color .2s}
-  .thr-hint:hover{color:var(--ink-soft)}
-
-  .stats{display:grid;grid-template-columns:1fr auto;gap:6px 14px;margin-top:16px;
-    font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);letter-spacing:-.01em}
-  .stats b{color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
-
-  .btn{display:block;width:100%;text-align:left;margin-top:9px;
-    font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:-.005em;
-    padding:11px 14px;border-radius:var(--r-md);color:var(--ink);
-    background:var(--glass-hi);
-    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-    border:1px solid var(--edge);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.14);
-    cursor:pointer;transition:transform .16s ease,background .2s ease,box-shadow .2s ease,border-color .2s ease}
-  .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.15);
-    border-color:var(--edge-lit);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 8px 22px -10px rgba(0,0,0,.6)}
-  .btn:active{transform:translateY(0)}
-  .btn .k{color:var(--ink-faint)}
-
-  .catch{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:14px;letter-spacing:-.01em}
-  .catch b{color:var(--ink);font-variant-numeric:tabular-nums}
-
-  /* ---------- log ---------- */
-  .log{grid-column:1/-1;padding:20px 24px}
-  .log h2{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.18em;
-    text-transform:uppercase;color:var(--ink-faint);margin-bottom:12px}
-  .rows{font-family:var(--mono);font-size:11.5px;max-height:158px;overflow-y:auto}
-  .row{display:grid;grid-template-columns:66px 96px 1fr auto;gap:14px;padding:4px 0;
-    border-bottom:1px solid rgba(255,255,255,.07);color:var(--ink-soft);
-    font-variant-numeric:tabular-nums}
-  .row:last-child{border:none}
-  .row .v.human{color:var(--human)}
-  .row .v.bot{color:var(--bot)}
-
-  /* ---------- disclaimer ---------- */
-  .disclaimer{grid-column:1/-1;padding:18px 24px;font-size:12px;color:var(--ink-faint);
-    line-height:1.65;letter-spacing:-.005em}
-  .disclaimer b{color:var(--ink-soft);font-family:var(--mono);font-size:10.5px;letter-spacing:.02em}
-  .disclaimer em{font-style:normal;color:var(--ink-soft)}
-
-  @media (max-width:900px){.wrap{grid-template-columns:1fr}}
-  @media (prefers-reduced-motion:reduce){
-    .ambient span{animation:none}
-    .fill,.thr,.btn,.hint{transition:none}
-  }
+  .cta-row { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .4rem; }
+  .btn.secondary { background: var(--surface); color: var(--accent); box-shadow: inset 0 0 0 1px var(--separator-strong); }
+  .btn.secondary:hover { background: var(--surface-2); }
 </style>
 </head>
 <body>
 
-<div class="ambient" aria-hidden="true">
-  <span class="a"></span><span class="b"></span><span class="c"></span><span class="d"></span>
-</div>
+<nav class="topnav" aria-label="Primary">
+  <div class="topnav-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5l9 5-4 1.2-1.6 4.3z"/></svg></span>
+      <span class="brand-text">Mouse-dynamics bot detection</span>
+    </a>
+    <div class="tabs">
+      <a href="/" aria-current="page">Detector</a>
+      <a href="/login.html">Sign-in test</a>
+      <a href="/challenge.html">CAPTCHA</a>
+    </div>
+    <span class="status" id="serverStatus" role="status">Checking…</span>
+  </div>
+</nav>
 
-<div class="wrap">
-  <header class="glass">
-    <h1>The detector, live</h1>
-    <p class="sub">Scoring with the frozen <code>AUGMENTED-18 / AUG_NAIVE_PLUS</code>
-      Random Forest. The browser computes the 18 features — bit-parity with the Java
-      pipeline, verified by <code>demo/parity.js</code> — and posts them to a local
-      scorer. Chunks are gap-split at 3&nbsp;s and need ≥20 distinct-time samples.</p>
-    <a class="cta" href="/login.html">Open the test login page <span>→</span>
-      <small>background mouse check + moving puzzle, judged together at sign-in</small></a>
+<main class="page">
+  <header class="page-head">
+    <p class="eyebrow">Passive channel · live</p>
+    <h1 class="display">Is that a person moving the mouse?</h1>
+    <p class="lede">A frozen Random Forest (<code>AUGMENTED-18 / AUG_NAIVE_PLUS</code>) scores your
+      movement as you go. The browser computes the 18 features, bit-for-bit identical to the Java
+      pipeline (verified by <code>demo/parity.js</code>), and sends only those numbers to the local
+      scorer. Movement is split at 3&nbsp;s gaps, and a chunk needs at least 20 distinct-time samples.</p>
+    <div class="cta-row">
+      <a class="btn" href="/login.html">Try the sign-in test</a>
+      <a class="btn secondary" href="/challenge.html">Open the CAPTCHA</a>
+    </div>
   </header>
 
-  <div class="arena" id="arena">
-    <canvas class="trail" id="trail"></canvas>
-    <div class="hint">move your mouse in here<br>a verdict updates as you go</div>
-  </div>
+  <div class="layout">
+    <div>
+      <div class="arena" id="arena" aria-label="Mouse capture area">
+        <canvas class="trail" id="trail"></canvas>
+        <div class="hint">
+          <span class="t">Move your mouse here</span>
+          <span class="s">The verdict updates as you go</span>
+        </div>
+      </div>
 
-  <div class="panel glass">
-    <h2>Current chunk</h2>
-    <div class="verdict">
-      <span class="label idle" id="verdict">—</span>
-      <span class="p" id="prob">P(bot) = ·</span>
-    </div>
-    <div class="meter">
-      <div class="fill" id="fill"></div>
-      <div class="thr" id="thr" style="left:87%"></div>
-    </div>
-    <div class="scale"><span>0.0 · human</span><span>bot · 1.0</span></div>
-
-    <label class="thr-ctl">
-      <span id="thrNote">decision line P(bot) ≥ 0.87</span>
-      <input type="range" id="thrSlider" min="0.40" max="0.97" step="0.01" value="0.87">
-      <span class="thr-hint" id="thrHint">Tier&nbsp;5 · 1% human-FPR budget · reset</span>
-    </label>
-
-    <div class="stats" id="stats">
-      <span>samples in window</span><b id="sN">0</b>
-      <span>chunk duration</span><b id="sDur">0 ms</b>
-      <span>mean velocity</span><b id="sVel">·</b>
-      <span>path efficiency</span><b id="sEff">·</b>
-      <span>pause ratio</span><b id="sPause">·</b>
+      <section class="card log" aria-labelledby="logTitle">
+        <h2 class="section-title" id="logTitle">Recent verdicts</h2>
+        <div class="rows" id="rows" aria-live="polite"></div>
+      </section>
     </div>
 
-    <h2 style="margin-top:22px">Simulate a bot</h2>
-    <button class="btn" id="btnBezier"><span class="k">▶</span> smooth min-jerk curve <span class="k">· NaturalMouseMotion</span></button>
-    <button class="btn" id="btnLinear"><span class="k">▶</span> constant-velocity line <span class="k">· pyautogui</span></button>
-    <button class="btn" id="btnStep"><span class="k">▶</span> teleport-and-settle <span class="k">· Selenium</span></button>
-    <button class="btn" id="btnEvasive"><span class="k">▶</span> feature-matched evasive <span class="k">· shuffled speeds</span></button>
-    <p class="catch" id="catch">bots caught at this threshold: <b id="catchN">0 / 0</b></p>
+    <aside>
+      <section class="card" aria-labelledby="chunkTitle">
+        <h2 class="section-title" id="chunkTitle">Current chunk</h2>
+        <div class="verdict">
+          <span class="label idle" id="verdict" aria-live="polite">—</span>
+          <span class="p" id="prob">P(bot) = ·</span>
+        </div>
+        <div class="meter" aria-hidden="true">
+          <div class="fill" id="fill"></div>
+          <div class="thr" id="thr" style="left:87%"></div>
+        </div>
+        <div class="scale"><span>0.0 · human</span><span>bot · 1.0</span></div>
+
+        <label class="thr-ctl">
+          <span id="thrNote">decision line P(bot) ≥ 0.87</span>
+          <input type="range" id="thrSlider" min="0.40" max="0.97" step="0.01" value="0.87" aria-describedby="thrHint">
+          <span class="thr-hint" id="thrHint">Tier&nbsp;5 · 1% human-FPR budget · reset</span>
+        </label>
+
+        <div class="stats" id="stats" style="margin-top:1.1rem">
+          <span>Samples in window</span><b id="sN">0</b>
+          <span>Chunk duration</span><b id="sDur">0 ms</b>
+          <span>Mean velocity</span><b id="sVel">·</b>
+          <span>Path efficiency</span><b id="sEff">·</b>
+          <span>Pause ratio</span><b id="sPause">·</b>
+        </div>
+
+        <hr class="divider">
+
+        <h2 class="section-title">Simulate a bot</h2>
+        <button class="action" id="btnBezier"><span class="glyph" aria-hidden="true">B1</span>
+          <span class="txt">Smooth min-jerk curve<small>NaturalMouseMotion</small></span></button>
+        <button class="action" id="btnLinear"><span class="glyph" aria-hidden="true">B2</span>
+          <span class="txt">Constant-velocity line<small>pyautogui</small></span></button>
+        <button class="action" id="btnStep"><span class="glyph" aria-hidden="true">B3</span>
+          <span class="txt">Teleport-and-settle<small>Selenium</small></span></button>
+        <button class="action" id="btnEvasive"><span class="glyph" aria-hidden="true">B4</span>
+          <span class="txt">Feature-matched evasive<small>shuffled speeds</small></span></button>
+        <p class="catch" id="catch">Bots caught at this threshold: <b id="catchN">0 / 0</b></p>
+      </section>
+    </aside>
   </div>
 
-  <div class="log glass">
-    <h2>Recent verdicts</h2>
-    <div class="rows" id="rows"></div>
-  </div>
+  <section aria-labelledby="howTitle">
+    <div class="steps-head">
+      <p class="eyebrow">How it works</p>
+      <h2 id="howTitle">Two independent checks. Never one blended score.</h2>
+    </div>
+    <div class="steps" style="margin-top:1.25rem">
+      <div class="step">
+        <span class="num">1</span>
+        <h3>Watch passively</h3>
+        <p>18 movement features are computed in the browser and scored by a Random Forest. Confident
+          humans pass silently, and confident bots are flagged.</p>
+        <span class="go" style="color:var(--ink-3)">You are here</span>
+      </div>
+      <a class="step" href="/login.html">
+        <span class="num">2</span>
+        <h3>Check at sign-in</h3>
+        <p>A drag puzzle whose target jumps mid-drag, timed on the server. Either check can veto
+          the sign-in. The two are combined by rules, not averaged.</p>
+        <span class="go">Try the sign-in test →</span>
+      </a>
+      <a class="step" href="/challenge.html">
+        <span class="num">3</span>
+        <h3>Challenge the uncertain</h3>
+        <p>Undecided traffic gets a CAPTCHA that reveals one target at a time on the server's clock,
+          so the route can't be precomputed or replayed.</p>
+        <span class="go">Open the CAPTCHA →</span>
+      </a>
+    </div>
+  </section>
 
-  <p class="disclaimer glass">
-    <b>READ BEFORE DEMOING.</b>
+  <p class="disclaimer">
+    <b>Read before demoing.</b>
     The model was trained where <em>human</em> = Balabit 40–80&nbsp;min admin-work
     sessions and <em>bot</em> = synthetic twins of those. This demo page is a
     <em>third</em> domain it has never seen, and absolute-velocity features depend
@@ -268,8 +213,19 @@
     new context, real captured-bot validation — are out of scope here and stay
     stated as limitations.
   </p>
-</div>
+</main>
 
+<footer class="site-foot">
+  <span>Mouse-dynamics bot detection · v1.1 · runs locally, no data leaves this machine</span>
+  <nav aria-label="Footer">
+    <a href="/">Detector</a>
+    <a href="/login.html">Sign-in test</a>
+    <a href="/challenge.html">CAPTCHA</a>
+    <a href="https://github.com/agenthemanth/cross-domain-mouse-bot-detection" rel="noopener">Source</a>
+  </nav>
+</footer>
+
+<script src="app.js"></script>
 <script src="features.js"></script>
 <script src="demo.js"></script>
 </body>

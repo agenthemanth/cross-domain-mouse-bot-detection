@@ -25,7 +25,10 @@ echo.
 echo [2/2] Starting server on http://127.0.0.1:8787/
 echo      Open that URL in Chrome. Press Ctrl+C in this window to stop.
 echo.
-REM  pass-through args: a port, --log-trials (participant study), --oracle (probes only)
-java -cp "target\classes;%WEKA%;%BOUNCE%" DemoServer %*
+REM  This is the DEMO launcher, so it turns on --oracle: the CAPTCHA page's
+REM  "Attack it" sims need the answer oracle. Never use it for a real deployment;
+REM  run DemoServer without --oracle there (see demo\README.md, "Running safely").
+REM  Extra args pass through: a port, --host <addr>, --log-trials (participant study).
+java -cp "target\classes;%WEKA%;%BOUNCE%" DemoServer --oracle %*
 
 pause

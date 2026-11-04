@@ -19,6 +19,7 @@
  * hidden so people don't adapt to it, and a fresh puzzle follows each trial. */
 (function () {
   'use strict';
+  var post = App.postJson, esc = App.esc, sleep = App.sleep, minJerk = App.minJerk;
   var MF = window.MouseFeatures;
 
   var $ = function (id) { return document.getElementById(id); };
@@ -64,9 +65,7 @@
     if (MF.collapse(last).length < MF.MIN_POINTS) return;
     var f = MF.extractAugmented(last);
     if (!f) return;
-    fetch('/score', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features: f }) })
-      .then(function (r) { return r.json(); })
+    post('/score', { features: f })
       .then(function (r) {
         if (r.error) return;
         $('pvLive').textContent = r.score.toFixed(3);
@@ -259,17 +258,6 @@
   function setPill(id, cls, text) { var el = $(id); el.className = 'pill ' + cls; el.textContent = text; }
 
   // ---------- helpers ----------
-  function post(url, body) {
-    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body) }).then(function (r) { return r.json(); });
-  }
-  function esc(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
-  }
-  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-  function minJerk(u) { return u * u * u * (10 - 15 * u + 6 * u * u); }
   function centreOf(el) { var r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
   function loadImage(uri) {
     return new Promise(function (done, fail) {

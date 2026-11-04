@@ -9,7 +9,7 @@
  * Points are [t_ms, x, y] triples, ascending in t. The Java pipeline computes
  * features in MILLISECONDS, so capture ms timestamps and pass them straight in.
  *
- * parity.html loads demo/model/golden_vectors.json (real held-out Balabit chunks
+ * demo/parity.js loads demo/model/golden_vectors.json (real held-out Balabit chunks
  * with their Java-computed feature vectors) and asserts extractAugmented() matches.
  */
 (function (global) {
@@ -156,7 +156,7 @@
     var nSteps = n - 1;
     var v = new Array(nSteps), stepDist = new Array(nSteps),
         dx = new Array(nSteps), dy = new Array(nSteps);
-    var totalDist = 0, i;
+    var i;
     for (i = 1; i < n; i++) {
       var dt = Math.max(p[i][0] - p[i - 1][0], MIN_DT_MS);
       var ddx = p[i][1] - p[i - 1][1];
@@ -164,7 +164,6 @@
       var d = Math.sqrt(ddx * ddx + ddy * ddy);
       dx[i - 1] = ddx; dy[i - 1] = ddy; stepDist[i - 1] = d;
       v[i - 1] = d / dt;
-      totalDist += d;
     }
 
     var meanV = mean(v);

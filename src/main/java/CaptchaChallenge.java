@@ -5,7 +5,6 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -15,7 +14,6 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.imageio.ImageIO;
 
 /**
  * SEQUENTIAL-REVEAL CAPTCHA -- the active challenge that the passive
@@ -332,9 +330,9 @@ public class CaptchaChallenge {
     static Verdict verify(Challenge ch, double[][] trace) {
         Verdict v = new Verdict();
 
-        if (ch.failed) { v.pass = false; v.flags.add("challenge failed: " + ch.failReason); return v; }
-        if (!ch.done()) { v.pass = false; v.flags.add("challenge incomplete (" + ch.hop + "/" + HOPS + " hops)"); return v; }
-        if (ch.consumed) { v.pass = false; v.flags.add("challenge already verified -- replay refused"); return v; }
+        if (ch.failed) { v.flags.add("challenge failed: " + ch.failReason); return v; }
+        if (!ch.done()) { v.flags.add("challenge incomplete (" + ch.hop + "/" + HOPS + " hops)"); return v; }
+        if (ch.consumed) { v.flags.add("challenge already verified -- replay refused"); return v; }
         ch.consumed = true;
 
         // ----- HARD: server clock only -----
@@ -358,12 +356,11 @@ public class CaptchaChallenge {
         }
 
         // ----- SOFT: client trace, only after reconciliation -----
-        if (trace == null || trace.length < Rules.MIN_TRACE_POINTS) {
-            v.tracePoints = trace == null ? 0 : trace.length;
+        v.tracePoints = trace == null ? 0 : trace.length;
+        if (v.tracePoints < Rules.MIN_TRACE_POINTS) {
             v.notes.add("trace too sparse to corroborate (" + v.tracePoints
                     + " < " + Rules.MIN_TRACE_POINTS + " samples) -- hard signals only");
         } else {
-            v.tracePoints = trace.length;
             double claimed = trace[trace.length - 1][0] - trace[0][0];
             v.traceCoverage = v.totalWallMs > 0 ? claimed / (double) v.totalWallMs : 0;
             double overrun = v.traceCoverage - 1.0;
@@ -553,9 +550,7 @@ public class CaptchaChallenge {
         }
         go.dispose();
 
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ImageIO.write(out, "png", bos);
-        return bos.toByteArray();
+        return PerturbationPuzzle.png(out);
     }
 
     // ---------------- JSON (same hand-rolled style as DemoServer) ----------------
@@ -590,22 +585,20 @@ public class CaptchaChallenge {
           .append(",\"traceCoverage\":").append(fmt(v.traceCoverage))
           .append(",\"tracePoints\":").append(v.tracePoints)
           .append(",\"corrections\":").append(v.corrections)
-          .append(",\"flags\":[");
-        for (int i = 0; i < v.flags.size(); i++) {
-            if (i > 0) sb.append(',');
-            sb.append(jsonStr(v.flags.get(i)));
-        }
-        sb.append("],\"notes\":[");
-        for (int i = 0; i < v.notes.size(); i++) {
-            if (i > 0) sb.append(',');
-            sb.append(jsonStr(v.notes.get(i)));
-        }
-        sb.append("],\"calibrated\":false}");
+          .append(",\"flags\":").append(jsonList(v.flags))
+          .append(",\"notes\":").append(jsonList(v.notes))
+          .append(",\"calibrated\":false}");
         return sb.toString();
     }
 
     private static String fmt(double d) {
-        return (Double.isNaN(d) || Double.isInfinite(d)) ? "null" : String.format("%.4f", d);
+        return (Double.isNaN(d) || Double.isInfinite(d)) ? "null" : String.format(java.util.Locale.ROOT, "%.4f", d);
+    }
+
+    static String jsonList(List<String> xs) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < xs.size(); i++) { if (i > 0) sb.append(','); sb.append(jsonStr(xs.get(i))); }
+        return sb.append("]").toString();
     }
 
     static String jsonStr(String s) {

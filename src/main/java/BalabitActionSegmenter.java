@@ -33,7 +33,6 @@ public final class BalabitActionSegmenter {
             this.type = type;
             this.points = points;
         }
-        public double durationSec() { return points.get(points.size() - 1)[0] - points.get(0)[0]; }
     }
 
     private static final double MM_SPLIT_PAUSE_SEC = 1.0;

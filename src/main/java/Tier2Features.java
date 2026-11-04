@@ -100,19 +100,10 @@ public final class Tier2Features {
         switch (mode) {
             case BASELINE:
                 return base;
-            case AUGMENTED: {
-                String[] out = new String[base.length + TIER2_NAMES.length];
-                System.arraycopy(base, 0, out, 0, base.length);
-                System.arraycopy(TIER2_NAMES, 0, out, base.length, TIER2_NAMES.length);
-                return out;
-            }
-            case SCALEFREE: {
-                String[] keep = {"num_points", "duration_ms", "path_efficiency"};
-                String[] out = new String[keep.length + TIER2_NAMES.length];
-                System.arraycopy(keep, 0, out, 0, keep.length);
-                System.arraycopy(TIER2_NAMES, 0, out, keep.length, TIER2_NAMES.length);
-                return out;
-            }
+            case AUGMENTED:
+                return concat(base, TIER2_NAMES);
+            case SCALEFREE:
+                return concat(new String[]{"num_points", "duration_ms", "path_efficiency"}, TIER2_NAMES);
             case AUGMENTED_SEQ:
                 return concat(featureNames(Mode.AUGMENTED), SEQ_NAMES);
             case SCALEFREE_SEQ:
@@ -238,7 +229,6 @@ public final class Tier2Features {
         double[] stepDist = new double[nSteps];
         double[] dx = new double[nSteps];
         double[] dy = new double[nSteps];
-        double totalDist = 0.0;
 
         for (int i = 1; i < n; i++) {
             double dt = Math.max(p.get(i)[0] - p.get(i - 1)[0], MIN_DT_MS);
@@ -249,7 +239,6 @@ public final class Tier2Features {
             dy[i - 1] = ddy;
             stepDist[i - 1] = dist;
             v[i - 1] = dist / dt;
-            totalDist += dist;
         }
 
         double meanV = mean(v);

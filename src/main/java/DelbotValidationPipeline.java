@@ -11,9 +11,7 @@ import weka.core.converters.CSVLoader;
 import weka.filters.Filter;
 import weka.filters.unsupervised.attribute.NumericToNominal;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -65,7 +63,7 @@ public class DelbotValidationPipeline {
             // extraction tools that wrap the zip's own top-level folder in an
             // extra outer folder (a common Windows "Extract All" behavior).
             List<File> sessionFolders = new ArrayList<>();
-            findSessionFolders(dataDir, sessionFolders);
+            BalabitValidationPipeline.findSessionFolders(dataDir, sessionFolders);
 
             if (sessionFolders.isEmpty()) {
                 throw new RuntimeException("No circles_human*/circles_bot* folders found anywhere under "
@@ -196,19 +194,6 @@ public class DelbotValidationPipeline {
         }
     }
 
-    private static void findSessionFolders(File dir, List<File> found) {
-        File[] children = dir.listFiles(File::isDirectory);
-        if (children == null) return;
-        Arrays.sort(children); // deterministic DFS order regardless of filesystem
-        for (File child : children) {
-            String name = child.getName();
-            if (name.startsWith("circles_human") || name.startsWith("circles_bot")) {
-                found.add(child);
-            } else {
-                findSessionFolders(child, found); // recurse into wrapper/nested folders
-            }
-        }
-    }
 
     private static SessionFeatures parseSession(File file, int label) {
         try {

@@ -9,7 +9,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -84,14 +83,14 @@ public class FalsePositiveEvaluator {
     private static Instances buildDelbotTrainingSet() throws Exception {
         File dataDir = new File(DELBOT_DATA_DIR);
         List<File> sessionFolders = new ArrayList<>();
-        findSessionFolders(dataDir, sessionFolders);
+        BalabitValidationPipeline.findSessionFolders(dataDir, sessionFolders);
         if (sessionFolders.isEmpty()) {
             throw new RuntimeException("No DELBOT session folders found under " + dataDir.getAbsolutePath()
                     + " -- run this from the same working directory as DelbotValidationPipeline.");
         }
         System.out.println("Found " + sessionFolders.size() + " DELBOT session folders.");
 
-        ArrayList<Attribute> attrs = buildAttributeSchema();
+        ArrayList<Attribute> attrs = BalabitValidationPipeline.buildAttributeSchema();
         Instances data = new Instances("delbot_training", attrs, 0);
         data.setClassIndex(attrs.size() - 1);
 
@@ -119,34 +118,6 @@ public class FalsePositiveEvaluator {
                     + " -> " + files.length + " files (parsed so far: " + filesParsed + "/" + filesSeen + ")");
         }
         return data;
-    }
-
-    private static ArrayList<Attribute> buildAttributeSchema() {
-        ArrayList<Attribute> attrs = new ArrayList<>();
-        attrs.add(new Attribute("num_points"));
-        attrs.add(new Attribute("duration_ms"));
-        attrs.add(new Attribute("mean_velocity"));
-        attrs.add(new Attribute("std_velocity"));
-        attrs.add(new Attribute("mean_acceleration"));
-        attrs.add(new Attribute("mean_jerk"));
-        attrs.add(new Attribute("path_efficiency"));
-        ArrayList<String> classVals = new ArrayList<>(Arrays.asList("0", "1"));
-        attrs.add(new Attribute("is_bot", classVals));
-        return attrs;
-    }
-
-    private static void findSessionFolders(File dir, List<File> found) {
-        File[] children = dir.listFiles(File::isDirectory);
-        if (children == null) return;
-        Arrays.sort(children);
-        for (File child : children) {
-            String name = child.getName();
-            if (name.startsWith("circles_human") || name.startsWith("circles_bot")) {
-                found.add(child);
-            } else {
-                findSessionFolders(child, found);
-            }
-        }
     }
 
     // Returns [num_points, duration_ms, mean_velocity, std_velocity, mean_acceleration, mean_jerk, path_efficiency]

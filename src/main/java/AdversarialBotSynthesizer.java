@@ -124,19 +124,35 @@ public final class AdversarialBotSynthesizer {
         }
         double devRef = Math.max(axLen, srcPathLen);
 
+        // ---- unit-amplitude deviation profile: independent of the scale being fitted,
+        //      so it is computed once rather than on every bisection step ----
+        double[] perpDev = new double[n], parDev = new double[n];
+        for (int i = 0; i < n; i++) {
+            double s = arcFrac[i];
+            double env = Math.sin(Math.PI * s); // 0 at both ends
+            double perp = 0, par = 0;
+            for (int m = 0; m < DEVIATION_MODES; m++) {
+                double w = Math.sin(freq[m] * s + phase[m]) * env;
+                perp += ampPerp[m] * w;
+                par += ampPar[m] * w;
+            }
+            perpDev[i] = perp;
+            parDev[i] = par;
+        }
+
         // ---- bisection on deviation scale to hit srcPathLen ----
         double lo = 0.0, hi = 2.0, scale = 0.3;
         for (int it = 0; it < LENGTH_FIT_ITERS; it++) {
             scale = 0.5 * (lo + hi);
             double len = buildLength(n, arcFrac, x0, y0, x1, y1, tx, ty, perpX, perpY,
-                    freq, phase, ampPerp, ampPar, scale * devRef, null);
+                    perpDev, parDev, scale * devRef, null);
             if (len > srcPathLen) hi = scale; else lo = scale;
         }
 
         // ---- emit ----
         List<double[]> bot = new ArrayList<>(n);
         buildLength(n, arcFrac, x0, y0, x1, y1, tx, ty, perpX, perpY,
-                freq, phase, ampPerp, ampPar, scale * devRef, bot);
+                perpDev, parDev, scale * devRef, bot);
         for (int i = 0; i < n; i++) {
             bot.get(i)[0] = times[i];
             bot.get(i)[1] = Math.rint(bot.get(i)[1]);
@@ -189,19 +205,13 @@ public final class AdversarialBotSynthesizer {
     private static double buildLength(int n, double[] arcFrac,
                                       double x0, double y0, double x1, double y1,
                                       double tx, double ty, double perpX, double perpY,
-                                      double[] freq, double[] phase, double[] ampPerp, double[] ampPar,
+                                      double[] perpDev, double[] parDev,
                                       double devScale, List<double[]> out) {
         if (out != null) out.clear();
         double prevX = 0, prevY = 0, total = 0;
         for (int i = 0; i < n; i++) {
             double s = arcFrac[i];
-            double env = Math.sin(Math.PI * s); // 0 at both ends
-            double perp = 0, par = 0;
-            for (int m = 0; m < freq.length; m++) {
-                double w = Math.sin(freq[m] * s + phase[m]) * env;
-                perp += ampPerp[m] * w;
-                par += ampPar[m] * w;
-            }
+            double perp = perpDev[i], par = parDev[i];
             double baseX = x0 + (x1 - x0) * s;
             double baseY = y0 + (y1 - y0) * s;
             double x = baseX + perpX * perp * devScale + tx * par * devScale;

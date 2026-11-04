@@ -30,17 +30,14 @@
   var buffer = [];
   var lastSource = 'you';
   var busy = false;
-  var lastScore = null;            // {score, source, feat, seg} of the most recent chunk
+  var lastScore = null;            // {score, source} of the most recent chunk
   var botRuns = [];                // {score} for each bot-sim run, for the "caught" counter
 
   // Trail colours come from the stylesheet and are read at draw time, so they
   // follow the light/dark appearance if it changes while the page is open.
   var COL_HUMAN = '--trail-human';
   var COL_BOT = '--trail-bot';
-  function cssVar(name, fallback) {
-    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return v || fallback;
-  }
+  var cssVar = App.cssVar;
 
   // ---------- canvas ----------
   function resize() {
@@ -141,18 +138,15 @@
 
   // ---------- scoring ----------
   function score(feat, seg, source, isBot) {
-    return fetch('/score', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ features: feat })
-    }).then(function (r) { return r.json(); }).then(function (res) {
+    return App.postJson('/score', { features: feat }).then(function (res) {
       if (res.error) { setIdle(res.error); return; }
       if (SERVER_THRESH !== res.threshold && botRuns.length === 0 &&
           Math.abs(UI_THRESH - SERVER_THRESH) < 0.001) {
-        SERVER_THRESH = res.threshold; UI_THRESH = res.threshold;
+        UI_THRESH = res.threshold;
         el.thrSlider.value = String(res.threshold);
       }
       SERVER_THRESH = res.threshold;
-      lastScore = { score: res.score, source: source, feat: feat, seg: seg };
+      lastScore = { score: res.score, source: source };
       render(res.score, source);
       showFeatures(feat, seg);
       logRow(source, res.score);
@@ -208,7 +202,7 @@
     var ax = b.x0 + 10, ay = b.y1 - 10, bx = b.x1 - 10, by = b.y0 + 10;
     var cx = (ax + bx) / 2 + (Math.random() * 120 - 60), cy = (ay + by) / 2 + (Math.random() * 120 - 60);
     for (var i = 0; i < n; i++) {
-      var u = i / (n - 1), e = u * u * u * (10 - 15 * u + 6 * u * u);   // quintic min-jerk
+      var u = i / (n - 1), e = App.minJerk(u);
       var x = (1 - e) * (1 - e) * ax + 2 * (1 - e) * e * cx + e * e * bx;
       var y = (1 - e) * (1 - e) * ay + 2 * (1 - e) * e * cy + e * e * by;
       out.push([i * 18, Math.round(x), Math.round(y)]);

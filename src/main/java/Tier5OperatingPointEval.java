@@ -443,7 +443,6 @@ public class Tier5OperatingPointEval {
     }
 
     private static int countGe(double[] a, double t) { int c = 0; for (double v : a) if (v >= t) c++; return c; }
-    private static int countGt(double[] a, double t) { int c = 0; for (double v : a) if (v > t) c++; return c; }
 
     private static double rocAuc(double[] pos, double[] neg) {
         int nPos = pos.length, nNeg = neg.length;

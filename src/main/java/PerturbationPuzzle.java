@@ -552,7 +552,7 @@ public class PerturbationPuzzle {
 
     private static int clamp8(int v) { return Math.max(0, Math.min(255, v)); }
 
-    private static byte[] png(BufferedImage img) throws IOException {
+    static byte[] png(BufferedImage img) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         ImageIO.write(img, "png", bos);
         return bos.toByteArray();
@@ -622,16 +622,11 @@ public class PerturbationPuzzle {
         sb.append(",\"jumpToDropMs\":").append(num(v.jumpToDropMs));
         sb.append(",\"carryPx\":").append(num(v.carryPx));
         sb.append(",\"peakCorrSpeed\":").append(num(v.peakCorrSpeed));
-        sb.append(",\"flags\":").append(list(v.flags));
-        sb.append(",\"notes\":").append(list(v.notes));
+        sb.append(",\"flags\":").append(CaptchaChallenge.jsonList(v.flags));
+        sb.append(",\"notes\":").append(CaptchaChallenge.jsonList(v.notes));
         return sb.append("}").toString();
     }
 
-    private static String list(List<String> xs) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < xs.size(); i++) { if (i > 0) sb.append(','); sb.append(CaptchaChallenge.jsonStr(xs.get(i))); }
-        return sb.append("]").toString();
-    }
     private static String num(double d) { return Double.isNaN(d) ? "null" : fmt(d); }
     private static String fmt(double d) { return String.format(java.util.Locale.ROOT, "%.2f", d); }
 }

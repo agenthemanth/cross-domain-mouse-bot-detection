@@ -151,7 +151,11 @@ public class DemoServer {
      * Content-Length, and a last-resort handler so no exception text or stack
      * trace ever reaches the client.
      */
-    private static com.sun.net.httpserver.HttpHandler guarded(com.sun.net.httpserver.HttpHandler h) {
+    /** A route body; any exception it throws is mapped by {@link #fail}. */
+    @FunctionalInterface
+    private interface Route { void handle(HttpExchange ex) throws Exception; }
+
+    private static com.sun.net.httpserver.HttpHandler guarded(Route h) {
         return ex -> {
             try {
                 securityHeaders(ex);
@@ -159,11 +163,8 @@ public class DemoServer {
                 if (len != null) {
                     long n;
                     try { n = Long.parseLong(len.trim()); } catch (NumberFormatException e) { n = -1; }
-                    if (n < 0 || n > MAX_BODY_BYTES) {
-                        send(ex, n < 0 ? 400 : 413, "application/json",
-                                n < 0 ? "{\"error\":\"bad Content-Length\"}" : "{\"error\":\"request body too large\"}");
-                        return;
-                    }
+                    if (n < 0) { error(ex, 400, "bad Content-Length"); return; }
+                    if (n > MAX_BODY_BYTES) { error(ex, 413, TOO_LARGE); return; }
                 }
                 h.handle(ex);
             } catch (Throwable t) {
@@ -178,20 +179,35 @@ public class DemoServer {
     private static void fail(HttpExchange ex, Throwable t) {
         try {
             if (t instanceof PayloadTooLarge) {
-                send(ex, 413, "application/json", "{\"error\":\"request body too large\"}");
+                error(ex, 413, TOO_LARGE);
             } else {
                 System.err.println("[" + ex.getRequestMethod() + " " + ex.getRequestURI().getPath() + "] " + t);
-                send(ex, 500, "application/json", "{\"error\":\"internal error\"}");
+                error(ex, 500, "internal error");
             }
         } catch (IOException | RuntimeException alreadyCommitted) {
             // response headers were already sent; nothing more can be reported to this client
         }
     }
 
+    private static final String TOO_LARGE = "request body too large";
+    private static final String ORACLE_OFF = "oracle disabled (start DemoServer with --oracle)";
+
+    /** Sends {@code {"error":"msg"}}; msg must not need JSON escaping. */
+    private static void error(HttpExchange ex, int code, String msg) throws IOException {
+        send(ex, code, "application/json", "{\"error\":\"" + msg + "\"}");
+    }
+
+    /** True if the request is a POST; otherwise answers 405 and returns false. */
+    private static boolean requirePost(HttpExchange ex) throws IOException {
+        if ("POST".equals(ex.getRequestMethod())) return true;
+        send(ex, 405, "text/plain", "POST only");
+        return false;
+    }
+
     // ---------------- /score ----------------
 
-    private static void handleScore(HttpExchange ex) throws IOException {
-        if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
+    private static void handleScore(HttpExchange ex) throws Exception {
+        if (!requirePost(ex)) return;
 
         String body = readBody(ex);
         double[] feat = parseFeatures(body);
@@ -201,16 +217,12 @@ public class DemoServer {
             return;
         }
         for (double v : feat) {
-            if (!Double.isFinite(v)) { send(ex, 400, "application/json", "{\"error\":\"features must be finite numbers\"}"); return; }
+            if (!Double.isFinite(v)) { error(ex, 400, "features must be finite numbers"); return; }
         }
-        try {
-            double score = forestScore(feat);
-            String label = score >= threshold ? "BOT" : "HUMAN";
-            send(ex, 200, "application/json", String.format(java.util.Locale.ROOT,
-                    "{\"score\":%.6f,\"label\":\"%s\",\"threshold\":%.4f}", score, label, threshold));
-        } catch (Exception e) {
-            fail(ex, e);
-        }
+        double score = forestScore(feat);
+        String label = score >= threshold ? "BOT" : "HUMAN";
+        send(ex, 200, "application/json", String.format(java.util.Locale.ROOT,
+                "{\"score\":%.6f,\"label\":\"%s\",\"threshold\":%.4f}", score, label, threshold));
     }
 
     private static double forestScore(double[] feat) throws Exception {
@@ -222,43 +234,39 @@ public class DemoServer {
 
     // ---------------- /puzzle/* (perturbation-response channel) ----------------
 
-    private static void handlePuzzle(HttpExchange ex) throws IOException {
+    private static void handlePuzzle(HttpExchange ex) throws Exception {
         String path = ex.getRequestURI().getPath();
-        try {
-            if (path.equals("/puzzle/oracle")) {
-                // SIMULATION AFFORDANCE, OFF unless the server was started with --oracle.
-                // Hands a probe the current slot so it can skip perception: it isolates
-                // the timing channel, exactly like /challenge/oracle. Never ship it.
-                if (!ORACLE) { send(ex, 404, "application/json", "{\"error\":\"oracle disabled (start DemoServer with --oracle)\"}"); return; }
-                PerturbationPuzzle.Puzzle p = PerturbationPuzzle.get(query(ex.getRequestURI().getRawQuery()).get("id"));
-                if (p == null) { send(ex, 404, "application/json", "{\"error\":\"unknown puzzle\"}"); return; }
-                send(ex, 200, "application/json", PerturbationPuzzle.oracleJson(p));
+        if (path.equals("/puzzle/oracle")) {
+            // SIMULATION AFFORDANCE, OFF unless the server was started with --oracle.
+            // Hands a probe the current slot so it can skip perception: it isolates
+            // the timing channel, exactly like /challenge/oracle. Never ship it.
+            if (!ORACLE) { error(ex, 404, ORACLE_OFF); return; }
+            PerturbationPuzzle.Puzzle p = PerturbationPuzzle.get(query(ex.getRequestURI().getRawQuery()).get("id"));
+            if (p == null) { error(ex, 404, "unknown puzzle"); return; }
+            send(ex, 200, "application/json", PerturbationPuzzle.oracleJson(p));
+            return;
+        }
+        if (!requirePost(ex)) return;
+        String body = readBody(ex);
+        if (path.equals("/puzzle/new")) {
+            send(ex, 200, "application/json", PerturbationPuzzle.issueJson(PerturbationPuzzle.issue()));
+            return;
+        }
+        PerturbationPuzzle.Puzzle p = PerturbationPuzzle.get(jsonString(body, "id"));
+        if (p == null) { error(ex, 404, "unknown puzzle"); return; }
+        double x = jsonNumber(body, "x", Double.NaN), y = jsonNumber(body, "y", Double.NaN);
+        String ack = jsonString(body, "ack");
+        switch (path) {
+            case "/puzzle/move":
+                if (Double.isNaN(x) || Double.isNaN(y)) { error(ex, 400, "x,y required"); return; }
+                send(ex, 200, "application/json", PerturbationPuzzle.move(p, x, y, (long) jsonNumber(body, "seq", -1), ack));
                 return;
-            }
-            if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
-            String body = readBody(ex);
-            if (path.equals("/puzzle/new")) {
-                send(ex, 200, "application/json", PerturbationPuzzle.issueJson(PerturbationPuzzle.issue()));
+            case "/puzzle/drop":
+                if (Double.isNaN(x) || Double.isNaN(y)) { error(ex, 400, "x,y required"); return; }
+                send(ex, 200, "application/json", PerturbationPuzzle.drop(p, x, y, ack));
                 return;
-            }
-            PerturbationPuzzle.Puzzle p = PerturbationPuzzle.get(jsonString(body, "id"));
-            if (p == null) { send(ex, 404, "application/json", "{\"error\":\"unknown puzzle\"}"); return; }
-            double x = jsonNumber(body, "x", Double.NaN), y = jsonNumber(body, "y", Double.NaN);
-            String ack = jsonString(body, "ack");
-            switch (path) {
-                case "/puzzle/move":
-                    if (Double.isNaN(x) || Double.isNaN(y)) { send(ex, 400, "application/json", "{\"error\":\"x,y required\"}"); return; }
-                    send(ex, 200, "application/json", PerturbationPuzzle.move(p, x, y, (long) jsonNumber(body, "seq", -1), ack));
-                    return;
-                case "/puzzle/drop":
-                    if (Double.isNaN(x) || Double.isNaN(y)) { send(ex, 400, "application/json", "{\"error\":\"x,y required\"}"); return; }
-                    send(ex, 200, "application/json", PerturbationPuzzle.drop(p, x, y, ack));
-                    return;
-                default:
-                    send(ex, 404, "application/json", "{\"error\":\"no such endpoint\"}");
-            }
-        } catch (Exception e) {
-            fail(ex, e);
+            default:
+                error(ex, 404, "no such endpoint");
         }
     }
 
@@ -279,74 +287,74 @@ public class DemoServer {
      *   puzzle PASS, passive <  threshold   -> HUMAN
      *   puzzle PASS, passive not scorable   -> HUMAN (passive: no evidence)
      */
-    private static void handleAuth(HttpExchange ex) throws IOException {
-        if (!"/auth/login".equals(ex.getRequestURI().getPath())) { send(ex, 404, "application/json", "{\"error\":\"no such endpoint\"}"); return; }
-        if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
+    private static void handleAuth(HttpExchange ex) throws Exception {
+        if (!"/auth/login".equals(ex.getRequestURI().getPath())) { error(ex, 404, "no such endpoint"); return; }
+        if (!requirePost(ex)) return;
         String body = readBody(ex);
-        try {
-            PerturbationPuzzle.Puzzle puzzle = PerturbationPuzzle.get(jsonString(body, "puzzle"));
-            PerturbationPuzzle.Verdict pv = PerturbationPuzzle.verify(puzzle);
+        PerturbationPuzzle.Puzzle puzzle = PerturbationPuzzle.get(jsonString(body, "puzzle"));
+        PerturbationPuzzle.Verdict pv = PerturbationPuzzle.verify(puzzle);
 
-            // passive channel: split by segment id, then by the 3 s gap rule
-            java.util.TreeMap<Integer, java.util.List<double[]>> bySeg = new java.util.TreeMap<>();
-            Matcher q = Pattern.compile("\\[\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9]+)\\s*\\]")
-                    .matcher(bgArray(body));
-            while (q.find()) {
-                bySeg.computeIfAbsent(Integer.parseInt(q.group(4)), k -> new java.util.ArrayList<>())
-                        .add(new double[]{ Double.parseDouble(q.group(1)), Double.parseDouble(q.group(2)), Double.parseDouble(q.group(3)) });
-            }
-            java.util.List<double[]> scores = new java.util.ArrayList<>();   // {score, distinctPoints, durationMs}
-            for (java.util.List<double[]> seg : bySeg.values()) {
-                for (java.util.List<double[]> chunk : BalabitValidationPipeline.splitByGap(seg, 3000.0)) {
-                    int distinct = BalabitValidationPipeline.collapseToDistinctTimestamps(chunk).size();
-                    if (distinct < BalabitValidationPipeline.MIN_POINTS_PER_SESSION) continue;
-                    double[] f = Tier2Features.compute(chunk, Tier2Features.Mode.AUGMENTED);
-                    if (f == null) continue;
-                    scores.add(new double[]{ forestScore(f), distinct, chunk.get(chunk.size() - 1)[0] - chunk.get(0)[0] });
-                }
-            }
-            while (scores.size() > MAX_PASSIVE_CHUNKS) scores.remove(0);
-            double passive = Double.NaN;
-            if (!scores.isEmpty()) {
-                double[] s = new double[scores.size()];
-                for (int i = 0; i < s.length; i++) s[i] = scores.get(i)[0];
-                java.util.Arrays.sort(s);
-                passive = s.length % 2 == 1 ? s[s.length / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
-            }
-            String passiveVerdict = Double.isNaN(passive) ? "NO_EVIDENCE" : passive >= threshold ? "BOT" : "HUMAN";
-
-            String decision, reason;
-            if (!pv.pass) { decision = "BOT"; reason = "moving puzzle failed"; }
-            else if ("BOT".equals(passiveVerdict)) { decision = "BOT"; reason = "background mouse movement vetoed"; }
-            else { decision = "HUMAN"; reason = "NO_EVIDENCE".equals(passiveVerdict)
-                    ? "puzzle passed; too little background movement to score" : "both channels passed"; }
-
-            boolean credsOk = DEMO_USER.equals(jsonString(body, "user")) && DEMO_PASS.equals(jsonString(body, "pass"));
-            boolean loggedIn = "HUMAN".equals(decision) && credsOk;
-
-            StringBuilder sb = new StringBuilder("{");
-            sb.append("\"decision\":\"").append(decision).append('"');
-            sb.append(",\"reason\":").append(CaptchaChallenge.jsonStr(reason));
-            sb.append(",\"credentialsOk\":").append(credsOk);
-            sb.append(",\"loggedIn\":").append(loggedIn);
-            sb.append(",\"puzzle\":").append(PerturbationPuzzle.verdictJson(pv));
-            sb.append(",\"passive\":{\"verdict\":\"").append(passiveVerdict).append('"');
-            sb.append(",\"median\":").append(Double.isNaN(passive) ? "null" : String.format(java.util.Locale.ROOT, "%.4f", passive));
-            sb.append(",\"threshold\":").append(String.format(java.util.Locale.ROOT, "%.4f", threshold));
-            sb.append(",\"samples\":").append(countSamples(bySeg));
-            sb.append(",\"chunks\":[");
-            for (int i = 0; i < scores.size(); i++) {
-                double[] c = scores.get(i);
-                if (i > 0) sb.append(',');
-                sb.append(String.format(java.util.Locale.ROOT, "{\"score\":%.4f,\"points\":%d,\"ms\":%.0f}", c[0], (int) c[1], c[2]));
-            }
-            sb.append("]}}");
-            String response = sb.toString();
-            if (LOG_TRIALS) logTrial(body, response, puzzle);
-            send(ex, 200, "application/json", response);
-        } catch (Exception e) {
-            fail(ex, e);
+        // passive channel: split by segment id, then by the 3 s gap rule
+        java.util.TreeMap<Integer, java.util.List<double[]>> bySeg = new java.util.TreeMap<>();
+        Matcher q = BG_SAMPLE.matcher(bgArray(body));
+        while (q.find()) {
+            bySeg.computeIfAbsent(Integer.parseInt(q.group(4)), k -> new java.util.ArrayList<>())
+                    .add(new double[]{ Double.parseDouble(q.group(1)), Double.parseDouble(q.group(2)), Double.parseDouble(q.group(3)) });
         }
+        java.util.List<double[]> feats = new java.util.ArrayList<>();
+        java.util.List<double[]> scores = new java.util.ArrayList<>();   // {score, distinctPoints, durationMs}
+        for (java.util.List<double[]> seg : bySeg.values()) {
+            for (java.util.List<double[]> chunk : BalabitValidationPipeline.splitByGap(seg, BalabitValidationPipeline.GAP_THRESHOLD_SEC * 1000.0)) {
+                int distinct = BalabitValidationPipeline.collapseToDistinctTimestamps(chunk).size();
+                if (distinct < BalabitValidationPipeline.MIN_POINTS_PER_SESSION) continue;
+                double[] f = Tier2Features.compute(chunk, Tier2Features.Mode.AUGMENTED);
+                if (f == null) continue;
+                feats.add(f);
+                scores.add(new double[]{ Double.NaN, distinct, chunk.get(chunk.size() - 1)[0] - chunk.get(0)[0] });
+            }
+        }
+        // only the most recent chunks are kept, so only those are run through the forest
+        int drop = Math.max(0, scores.size() - MAX_PASSIVE_CHUNKS);
+        scores = scores.subList(drop, scores.size());
+        for (int i = 0; i < scores.size(); i++) scores.get(i)[0] = forestScore(feats.get(drop + i));
+        double passive = Double.NaN;
+        if (!scores.isEmpty()) {
+            double[] s = new double[scores.size()];
+            for (int i = 0; i < s.length; i++) s[i] = scores.get(i)[0];
+            java.util.Arrays.sort(s);
+            passive = s.length % 2 == 1 ? s[s.length / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+        }
+        String passiveVerdict = Double.isNaN(passive) ? "NO_EVIDENCE" : passive >= threshold ? "BOT" : "HUMAN";
+
+        String decision, reason;
+        if (!pv.pass) { decision = "BOT"; reason = "moving puzzle failed"; }
+        else if ("BOT".equals(passiveVerdict)) { decision = "BOT"; reason = "background mouse movement vetoed"; }
+        else { decision = "HUMAN"; reason = "NO_EVIDENCE".equals(passiveVerdict)
+                ? "puzzle passed; too little background movement to score" : "both channels passed"; }
+
+        boolean credsOk = DEMO_USER.equals(jsonString(body, "user")) && DEMO_PASS.equals(jsonString(body, "pass"));
+        boolean loggedIn = "HUMAN".equals(decision) && credsOk;
+
+        StringBuilder sb = new StringBuilder("{");
+        sb.append("\"decision\":\"").append(decision).append('"');
+        sb.append(",\"reason\":").append(CaptchaChallenge.jsonStr(reason));
+        sb.append(",\"credentialsOk\":").append(credsOk);
+        sb.append(",\"loggedIn\":").append(loggedIn);
+        sb.append(",\"puzzle\":").append(PerturbationPuzzle.verdictJson(pv));
+        sb.append(",\"passive\":{\"verdict\":\"").append(passiveVerdict).append('"');
+        sb.append(",\"median\":").append(Double.isNaN(passive) ? "null" : String.format(java.util.Locale.ROOT, "%.4f", passive));
+        sb.append(",\"threshold\":").append(String.format(java.util.Locale.ROOT, "%.4f", threshold));
+        sb.append(",\"samples\":").append(countSamples(bySeg));
+        sb.append(",\"chunks\":[");
+        for (int i = 0; i < scores.size(); i++) {
+            double[] c = scores.get(i);
+            if (i > 0) sb.append(',');
+            sb.append(String.format(java.util.Locale.ROOT, "{\"score\":%.4f,\"points\":%d,\"ms\":%.0f}", c[0], (int) c[1], c[2]));
+        }
+        sb.append("]}}");
+        String response = sb.toString();
+        if (LOG_TRIALS) logTrial(body, response, puzzle);
+        send(ex, 200, "application/json", response);
     }
 
     /**
@@ -396,7 +404,7 @@ public class DemoServer {
 
     /** Pulls the numbers out of {@code {"features":[ ... ]}} without a JSON library. */
     private static double[] parseFeatures(String body) {
-        Matcher m = Pattern.compile("\"features\"\\s*:\\s*\\[([^\\]]*)\\]").matcher(body);
+        Matcher m = FEATURES.matcher(body);
         if (!m.find()) return null;
         String inner = m.group(1).trim();
         if (inner.isEmpty()) return new double[0];
@@ -412,76 +420,72 @@ public class DemoServer {
 
     // ---------------- /challenge/* (the CAPTCHA channel) ----------------
 
-    private static void handleChallenge(HttpExchange ex) throws IOException {
+    private static void handleChallenge(HttpExchange ex) throws Exception {
 
         String path = ex.getRequestURI().getPath();
         Map<String, String> q = query(ex.getRequestURI().getRawQuery());
 
-        try {
-            switch (path) {
-                case "/challenge/new": {
-                    if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
-                    CaptchaChallenge.Challenge ch = CaptchaChallenge.issue();
-                    send(ex, 200, "application/json", CaptchaChallenge.boardJson(ch));
-                    return;
-                }
-                case "/challenge/tile": {
-                    CaptchaChallenge.Challenge ch = CaptchaChallenge.get(q.get("id"));
-                    if (ch == null) { send(ex, 404, "application/json", "{\"error\":\"unknown challenge\"}"); return; }
-                    int k;
-                    try { k = Integer.parseInt(q.getOrDefault("k", "-1")); } catch (NumberFormatException e) { k = -1; }
-                    if (k < 0 || k >= ch.tiles.size()) { send(ex, 400, "application/json", "{\"error\":\"bad tile\"}"); return; }
-                    sendBytes(ex, CaptchaChallenge.renderTile(ch, k));
-                    return;
-                }
-                case "/challenge/prompt": {
-                    CaptchaChallenge.Challenge ch = CaptchaChallenge.get(q.get("id"));
-                    if (ch == null) { send(ex, 404, "application/json", "{\"error\":\"unknown challenge\"}"); return; }
-                    if (ch.failed || ch.done()) { send(ex, 409, "application/json", "{\"error\":\"no active hop\"}"); return; }
-                    // NOTE: only the CURRENT hop is renderable. Asking for a later
-                    // one is exactly the precomputation this design refuses.
-                    sendBytes(ex, CaptchaChallenge.renderPrompt(ch, ch.hop));
-                    return;
-                }
-                case "/challenge/oracle": {
-                    // SIMULATION AFFORDANCE, NOT PART OF THE SCHEME. Hands the
-                    // caller the current answer so a browser bot-sim can play
-                    // without an OCR model. It grants the attacker a PERFECT
-                    // perceptual layer for free, which is exactly the point:
-                    // it isolates the timing channel as the only thing under
-                    // test. A real deployment must not expose this route, so it
-                    // is OFF unless the server was started with --oracle.
-                    if (!ORACLE) { send(ex, 404, "application/json", "{\"error\":\"oracle disabled (start DemoServer with --oracle)\"}"); return; }
-                    CaptchaChallenge.Challenge ch = CaptchaChallenge.get(q.get("id"));
-                    if (ch == null) { send(ex, 404, "application/json", "{\"error\":\"unknown challenge\"}"); return; }
-                    if (ch.failed || ch.done()) { send(ex, 409, "application/json", "{\"error\":\"no active hop\"}"); return; }
-                    send(ex, 200, "application/json",
-                            "{\"k\":" + ch.currentTarget() + ",\"hop\":" + ch.hop + "}");
-                    return;
-                }
-                case "/challenge/arrive": {
-                    if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
-                    String body = readBody(ex);
-                    CaptchaChallenge.Challenge ch = CaptchaChallenge.get(jsonString(body, "id"));
-                    if (ch == null) { send(ex, 404, "application/json", "{\"error\":\"unknown challenge\"}"); return; }
-                    int k = (int) jsonNumber(body, "k", -1);
-                    send(ex, 200, "application/json", CaptchaChallenge.arrive(ch, k));
-                    return;
-                }
-                case "/challenge/verify": {
-                    if (!"POST".equals(ex.getRequestMethod())) { send(ex, 405, "text/plain", "POST only"); return; }
-                    String body = readBody(ex);
-                    CaptchaChallenge.Challenge ch = CaptchaChallenge.get(jsonString(body, "id"));
-                    if (ch == null) { send(ex, 404, "application/json", "{\"error\":\"unknown challenge\"}"); return; }
-                    send(ex, 200, "application/json",
-                            CaptchaChallenge.verdictJson(CaptchaChallenge.verify(ch, parseTrace(body))));
-                    return;
-                }
-                default:
-                    send(ex, 404, "application/json", "{\"error\":\"no such endpoint\"}");
+        switch (path) {
+            case "/challenge/new": {
+                if (!requirePost(ex)) return;
+                CaptchaChallenge.Challenge ch = CaptchaChallenge.issue();
+                send(ex, 200, "application/json", CaptchaChallenge.boardJson(ch));
+                return;
             }
-        } catch (Exception e) {
-            fail(ex, e);
+            case "/challenge/tile": {
+                CaptchaChallenge.Challenge ch = CaptchaChallenge.get(q.get("id"));
+                if (ch == null) { error(ex, 404, "unknown challenge"); return; }
+                int k;
+                try { k = Integer.parseInt(q.getOrDefault("k", "-1")); } catch (NumberFormatException e) { k = -1; }
+                if (k < 0 || k >= ch.tiles.size()) { error(ex, 400, "bad tile"); return; }
+                sendBytes(ex, CaptchaChallenge.renderTile(ch, k));
+                return;
+            }
+            case "/challenge/prompt": {
+                CaptchaChallenge.Challenge ch = CaptchaChallenge.get(q.get("id"));
+                if (ch == null) { error(ex, 404, "unknown challenge"); return; }
+                if (ch.failed || ch.done()) { error(ex, 409, "no active hop"); return; }
+                // NOTE: only the CURRENT hop is renderable. Asking for a later
+                // one is exactly the precomputation this design refuses.
+                sendBytes(ex, CaptchaChallenge.renderPrompt(ch, ch.hop));
+                return;
+            }
+            case "/challenge/oracle": {
+                // SIMULATION AFFORDANCE, NOT PART OF THE SCHEME. Hands the
+                // caller the current answer so a browser bot-sim can play
+                // without an OCR model. It grants the attacker a PERFECT
+                // perceptual layer for free, which is exactly the point:
+                // it isolates the timing channel as the only thing under
+                // test. A real deployment must not expose this route, so it
+                // is OFF unless the server was started with --oracle.
+                if (!ORACLE) { error(ex, 404, ORACLE_OFF); return; }
+                CaptchaChallenge.Challenge ch = CaptchaChallenge.get(q.get("id"));
+                if (ch == null) { error(ex, 404, "unknown challenge"); return; }
+                if (ch.failed || ch.done()) { error(ex, 409, "no active hop"); return; }
+                send(ex, 200, "application/json",
+                        "{\"k\":" + ch.currentTarget() + ",\"hop\":" + ch.hop + "}");
+                return;
+            }
+            case "/challenge/arrive": {
+                if (!requirePost(ex)) return;
+                String body = readBody(ex);
+                CaptchaChallenge.Challenge ch = CaptchaChallenge.get(jsonString(body, "id"));
+                if (ch == null) { error(ex, 404, "unknown challenge"); return; }
+                int k = (int) jsonNumber(body, "k", -1);
+                send(ex, 200, "application/json", CaptchaChallenge.arrive(ch, k));
+                return;
+            }
+            case "/challenge/verify": {
+                if (!requirePost(ex)) return;
+                String body = readBody(ex);
+                CaptchaChallenge.Challenge ch = CaptchaChallenge.get(jsonString(body, "id"));
+                if (ch == null) { error(ex, 404, "unknown challenge"); return; }
+                send(ex, 200, "application/json",
+                        CaptchaChallenge.verdictJson(CaptchaChallenge.verify(ch, parseTrace(body))));
+                return;
+            }
+            default:
+                error(ex, 404, "no such endpoint");
         }
     }
 
@@ -504,24 +508,32 @@ public class DemoServer {
         return out;
     }
 
+    // request-parsing patterns, compiled once (per key for the field lookups)
+    private static final Map<String, Pattern> STR_KEY = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<String, Pattern> NUM_KEY = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Pattern BG_SAMPLE = Pattern.compile(
+            "\\[\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9]+)\\s*\\]");
+    private static final Pattern FEATURES = Pattern.compile("\"features\"\\s*:\\s*\\[([^\\]]*)\\]");
+    private static final Pattern TRACE = Pattern.compile("\"trace\"\\s*:\\s*\\[(.*)\\]\\s*\\}?\\s*$", Pattern.DOTALL);
+    private static final Pattern TRIPLE = Pattern.compile(
+            "\\[\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9.eE+]+)\\s*\\]");
+
     private static String jsonString(String body, String key) {
-        Matcher m = Pattern.compile("\"" + key + "\"\\s*:\\s*\"([^\"]*)\"").matcher(body);
+        Matcher m = STR_KEY.computeIfAbsent(key, k -> Pattern.compile("\"" + k + "\"\\s*:\\s*\"([^\"]*)\"")).matcher(body);
         return m.find() ? m.group(1) : null;
     }
 
     private static double jsonNumber(String body, String key, double fallback) {
-        Matcher m = Pattern.compile("\"" + key + "\"\\s*:\\s*(-?[0-9.]+)").matcher(body);
+        Matcher m = NUM_KEY.computeIfAbsent(key, k -> Pattern.compile("\"" + k + "\"\\s*:\\s*(-?[0-9.]+)")).matcher(body);
         if (!m.find()) return fallback;
         try { return Double.parseDouble(m.group(1)); } catch (NumberFormatException e) { return fallback; }
     }
 
     /** Pulls {@code "trace":[[t,x,y],...]} out of the body. Returns null when absent. */
     private static double[][] parseTrace(String body) {
-        Matcher outer = Pattern.compile("\"trace\"\\s*:\\s*\\[(.*)\\]\\s*\\}?\\s*$",
-                Pattern.DOTALL).matcher(body);
+        Matcher outer = TRACE.matcher(body);
         if (!outer.find()) return null;
-        Matcher triple = Pattern.compile("\\[\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9.eE+]+)\\s*,\\s*(-?[0-9.eE+]+)\\s*\\]")
-                .matcher(outer.group(1));
+        Matcher triple = TRIPLE.matcher(outer.group(1));
         java.util.List<double[]> pts = new java.util.ArrayList<>();
         while (triple.find()) {
             try {
@@ -546,7 +558,7 @@ public class DemoServer {
      * server logs and Python probes, so this is an allow-list: a known web
      * extension, no hidden/underscore files, and never anything under study_data/.
      */
-    private static void handleStatic(HttpExchange ex) throws IOException {
+    private static void handleStatic(HttpExchange ex) throws Exception {
         String method = ex.getRequestMethod();
         if (!"GET".equals(method) && !"HEAD".equals(method)) { send(ex, 405, "text/plain", "GET only"); return; }
         String p = ex.getRequestURI().getPath();
@@ -565,11 +577,11 @@ public class DemoServer {
             send(ex, 404, "text/plain", "not found");
             return;
         }
-        byte[] bytes = Files.readAllBytes(f.toPath());
         ex.getResponseHeaders().set("Content-Type", contentType(ext));
         // pages and scripts change between runs of a demo; always revalidate
         ex.getResponseHeaders().set("Cache-Control", "no-cache");
         if ("HEAD".equals(method)) { ex.sendResponseHeaders(200, -1); return; }
+        byte[] bytes = Files.readAllBytes(f.toPath());
         ex.sendResponseHeaders(200, bytes.length);
         try (OutputStream os = ex.getResponseBody()) { os.write(bytes); }
     }

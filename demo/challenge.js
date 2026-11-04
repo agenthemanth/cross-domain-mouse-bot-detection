@@ -8,10 +8,7 @@
 (function () {
   'use strict';
 
-  function cssVar(name, fallback) {
-    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return v || fallback;
-  }
+  var cssVar = App.cssVar, esc = App.esc, sleep = App.sleep;
 
   var board = document.getElementById('board');
   var canvas = document.getElementById('trail');
@@ -139,24 +136,28 @@
     setTimeout(function () { t.classList.remove(cls); }, 420);
   }
 
+  /** Reports arrival at tile k and applies the hop transition the server returns. */
+  function arrive(k) {
+    return App.postJson('/challenge/arrive', { id: ch.id, k: k }).then(function (res) {
+      if (res.state === 'next') { hop = res.hop; buildPips(); refreshPrompt(); }
+      else if (res.state === 'complete') { hop = ch.hops; buildPips(); board.classList.add('locked'); }
+      return res;
+    });
+  }
+
   function clickTile(k) {
     if (!live) return;
-    return fetch('/challenge/arrive', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: ch.id, k: k })
-    }).then(function (r) { return r.json(); }).then(function (res) {
+    return arrive(k).then(function (res) {
       if (res.state === 'next') {
         flash(k, 'hit');
-        hop = res.hop; buildPips(); refreshPrompt();
         el.hint.textContent = 'hop ' + (hop + 1) + ' of ' + ch.hops + ' — next glyph released';
-        return 'next';
+        return;
       }
       if (res.state === 'complete') {
         flash(k, 'hit');
-        hop = ch.hops; buildPips();
-        live = false; board.classList.add('locked');
+        live = false;
         el.hint.textContent = 'route complete — verifying';
-        return submit().then(function () { return 'complete'; });
+        return submit();
       }
       // failed
       flash(k, 'miss');
@@ -165,15 +166,11 @@
       showVerdict({ pass: false, flags: [res.reason || 'wrong tile'], notes: [],
         hopWallMs: [], hopWallMad: null, traceCoverage: null,
         tracePoints: trace.length, corrections: -1, totalWallMs: 0 });
-      return 'failed';
     });
   }
 
   function submit(overrideTrace) {
-    return fetch('/challenge/verify', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: ch.id, trace: overrideTrace || trace })
-    }).then(function (r) { return r.json(); }).then(function (v) {
+    return App.postJson('/challenge/verify', { id: ch.id, trace: overrideTrace || trace }).then(function (v) {
       showVerdict(v);
       setVeil(true, v.pass ? 'Passed' : 'Rejected',
         v.pass ? 'no rule tripped — see the panel for the timings that decided it'
@@ -185,11 +182,6 @@
   function setVeil(on, title, sub) {
     el.veil.classList.toggle('on', !!on);
     if (on) el.veil.innerHTML = '<div>' + esc(title) + '<small>' + esc(sub || '') + '</small></div>';
-  }
-  function esc(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-    });
   }
 
   // ---------- verdict panel ----------
@@ -253,7 +245,6 @@
   // OCR attacker for free and test only the timing channel. That route exists for
   // this demo alone and must never ship.
 
-  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
   function oracle() {
     return fetch('/challenge/oracle?id=' + encodeURIComponent(ch.id))
@@ -299,7 +290,7 @@
       (function tick() {
         i++;
         var u = i / n;
-        var e = kind === 'bezier' ? u * u * u * (10 - 15 * u + 6 * u * u) : u;  // quintic min-jerk
+        var e = kind === 'bezier' ? App.minJerk(u) : u;
         var x = from[0] + (to[0] - from[0]) * e;
         var y = from[1] + (to[1] - from[1]) * e;
         if (kind === 'bezier') y += Math.sin(u * Math.PI) * 34;                 // an arc, not a ruler
@@ -332,18 +323,12 @@
             return movePath(cursor, centre(o.k), kind);
           }).then(function (at) {
             cursor = at;
-            return fetch('/challenge/arrive', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: ch.id, k: o.k })
-            }).then(function (r) { return r.json(); }).then(function (res) {
+            return arrive(o.k).then(function (res) {
               flash(o.k, 'hit');
               if (res.state === 'next') {
-                hop = res.hop; buildPips(); refreshPrompt();
                 el.hint.textContent = name + ' — hop ' + (hop + 1) + ' of ' + ch.hops;
                 return step();
               }
-              hop = ch.hops; buildPips();
-              board.classList.add('locked');
               var sent = trace;
               if (forge) {
                 // Rewrite every timestamp so the trace CLAIMS a longer span than
